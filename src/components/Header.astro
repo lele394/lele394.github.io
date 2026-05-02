@@ -5,63 +5,197 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 
 <header class="site-header">
-	<nav>
-		<h2><a href={`${base}/`}>{SITE_TITLE}</a></h2>
-		<div class="links" aria-label="Primary">
+	<nav class="nav-shell" aria-label="Primary">
+		<a class="site-title" href={`${base}/`}>{SITE_TITLE}</a>
+		<button class="menu-toggle" type="button" aria-expanded="false" aria-controls="primary-drawer">
+			<span class="sr-only">Open menu</span>
+			<span aria-hidden="true">☰</span>
+		</button>
+		<div class="drawer-backdrop" data-backdrop hidden></div>
+		<div class="links" id="primary-drawer">
 			<HeaderLink href="/">Home</HeaderLink>
 			<HeaderLink href="/blog">Blog</HeaderLink>
 			<HeaderLink href="/resume">Resume</HeaderLink>
 		</div>
 	</nav>
 </header>
+
 <style>
 	header {
-		padding: 0 1rem;
+		padding: 0.75rem 1rem 0.9rem;
 		border-bottom: 1px solid var(--border);
 		background: var(--bg);
-	}
-	h2 {
-		margin: 0;
-		font-size: 1rem;
-		font-weight: 700;
+		position: relative;
+		z-index: 20;
 	}
 
-	h2 a,
-	h2 a.active {
-		text-decoration: none;
-		color: var(--text);
-	}
-	nav {
+	.nav-shell {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		gap: 1rem;
 		max-width: var(--layout-max-width);
 		margin: 0 auto;
-		gap: 1rem;
 	}
-	nav a {
+
+	.site-title {
+		margin: 0;
+		font-size: 1rem;
+		font-weight: 700;
+		line-height: 1.2;
+		text-decoration: none;
+		color: var(--text);
+	}
+
+	.menu-toggle {
+		display: none;
+		align-items: center;
+		justify-content: center;
+		width: 2.5rem;
+		height: 2.5rem;
+		border: 1px solid var(--border);
+		background: var(--surface);
+		color: var(--text);
+		border-radius: 4px;
+		font: inherit;
+		cursor: pointer;
+	}
+
+	.links {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		flex-wrap: wrap;
+	}
+
+	.links a {
+		display: flex;
 		padding: 0.6rem 0.4rem;
 		color: var(--text);
 		border-bottom: 2px solid transparent;
 		text-decoration: none;
 		transition: border-color 120ms ease, color 120ms ease;
 	}
-	nav a.active {
+
+	.links a.active {
 		border-bottom-color: var(--accent);
 		color: var(--accent);
 	}
-	.links,
-	.links a {
-		display: flex;
-		gap: 0.6rem;
+
+	.drawer-backdrop {
+		display: none;
 	}
+
 	@media (max-width: 720px) {
-		nav {
-			flex-direction: column;
-			align-items: flex-start;
+		.menu-toggle {
+			display: inline-flex;
 		}
+
 		.links {
-			flex-wrap: wrap;
+			position: fixed;
+			top: 0;
+			right: 0;
+			width: min(18rem, 82vw);
+			height: 100dvh;
+			padding: 4.5rem 1rem 1rem;
+			background: var(--bg);
+			border-left: 1px solid var(--border);
+			box-shadow: -10px 0 30px rgba(15, 23, 42, 0.08);
+			transform: translateX(100%);
+			transition: transform 180ms ease;
+			flex-direction: column;
+			align-items: stretch;
+			gap: 0.25rem;
+			z-index: 40;
 		}
+
+		.links.is-open {
+			transform: translateX(0);
+		}
+
+		.links a {
+			width: 100%;
+			padding: 0.9rem 0.25rem;
+			border-bottom-color: transparent;
+		}
+
+		.links a.active {
+			background: color-mix(in srgb, var(--accent) 8%, transparent);
+		}
+
+		.drawer-backdrop {
+			display: block;
+			position: fixed;
+			inset: 0;
+			background: rgba(15, 17, 21, 0.28);
+			opacity: 0;
+			pointer-events: none;
+			transition: opacity 180ms ease;
+			z-index: 30;
+		}
+
+		.drawer-backdrop.is-open {
+			opacity: 1;
+			pointer-events: auto;
+		}
+	}
+
+	@media (min-width: 721px) {
+		.links {
+			position: static;
+			width: auto;
+			height: auto;
+			padding: 0;
+			border-left: none;
+			box-shadow: none;
+			transform: none !important;
+			background: transparent;
+		}
+	}
+
+	:global(body.nav-open) {
+		overflow: hidden;
 	}
 </style>
+
+<script>
+	document.addEventListener('DOMContentLoaded', () => {
+		const toggle = document.querySelector('.menu-toggle');
+		const drawer = document.querySelector('#primary-drawer');
+		const backdrop = document.querySelector('[data-backdrop]');
+		const body = document.body;
+
+		if (!(toggle instanceof HTMLButtonElement) || !(drawer instanceof HTMLElement) || !(backdrop instanceof HTMLElement)) {
+			return;
+		}
+
+		const closeMenu = () => {
+			drawer.classList.remove('is-open');
+			backdrop.classList.remove('is-open');
+			toggle.setAttribute('aria-expanded', 'false');
+			body.classList.remove('nav-open');
+		};
+
+		const openMenu = () => {
+			drawer.classList.add('is-open');
+			backdrop.classList.add('is-open');
+			toggle.setAttribute('aria-expanded', 'true');
+			body.classList.add('nav-open');
+		};
+
+		toggle.addEventListener('click', () => {
+			if (drawer.classList.contains('is-open')) closeMenu();
+			else openMenu();
+		});
+
+		backdrop.addEventListener('click', closeMenu);
+
+		drawer.querySelectorAll('a').forEach((link) => {
+			link.addEventListener('click', closeMenu);
+		});
+
+		document.addEventListener('keydown', (event) => {
+			if (event.key === 'Escape') closeMenu();
+		});
+	});
+</script>

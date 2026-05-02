@@ -17,6 +17,12 @@
 	--shadow-sm: 0 1px 4px rgba(16,24,40,0.04);
 }
 
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
 html, body {
 	height: 100%;
 }
@@ -105,8 +111,23 @@ th, td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); text-a
 /* Responsive adjustments */
 @media (max-width: 720px) {
 	body { font-size: 16px; }
-	main { margin: 28px auto; }
-	h1 { font-size: 1.5rem; }
+	main { margin: 24px 0; padding: 0 16px; }
+	h1 { font-size: 1.4rem; }
+	h2 { font-size: 1.1rem; }
+	h3 { font-size: 0.95rem; }
+}
+
+@media (max-width: 480px) {
+	body { font-size: 14px; }
+	main { margin: 16px 0; padding: 0 16px; }
+	h1 { font-size: 1.2rem; }
+	h2 { font-size: 1rem; }
+	h3 { font-size: 0.9rem; }
+	p { font-size: 0.95rem; }
+	table { font-size: 0.85rem; }
+	th, td { padding: 0.35rem 0.4rem; }
+	pre { padding: 0.65rem 0.8rem; font-size: 0.8rem; }
+	code { font-size: 0.88em; padding: 2px 4px; }
 }
 
 /* Small helpers for blog list / cards */
