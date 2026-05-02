@@ -29,6 +29,10 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 				border: 1px solid var(--border);
 				border-radius: 4px;
 			}
+			.hero-image img,
+			.image-card img {
+				cursor: zoom-in;
+			}
 			.prose {
 				width: 100%;
 				max-width: 100%;
@@ -72,6 +76,61 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 				padding-top: 0.8rem;
 				border-top: 1px solid var(--border);
 			}
+			.image-lightbox {
+				padding: 0;
+				border: 0;
+				background: transparent;
+				max-width: none;
+				max-height: none;
+			}
+			.image-lightbox::backdrop {
+				background: rgba(11, 18, 32, 0.82);
+				backdrop-filter: blur(3px);
+			}
+			.image-lightbox__panel {
+				position: relative;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				padding: 1rem;
+				width: min(96vw, 1280px);
+				height: min(96vh, 920px);
+			}
+			.image-lightbox__button {
+				position: absolute;
+				top: 0.75rem;
+				right: 0.75rem;
+				z-index: 1;
+				border: 1px solid rgba(255, 255, 255, 0.2);
+				border-radius: 999px;
+				background: rgba(11, 18, 32, 0.75);
+				color: #fff;
+				padding: 0.45rem 0.8rem;
+				cursor: pointer;
+			}
+			.image-lightbox__button:hover {
+				border-bottom-color: rgba(255, 255, 255, 0.2);
+			}
+			.image-lightbox__img {
+				max-width: 100%;
+				max-height: 100%;
+				width: auto;
+				height: auto;
+				object-fit: contain;
+				border-radius: 8px;
+				box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+			}
+			@media (max-width: 720px) {
+				.image-lightbox__panel {
+					padding: 0.65rem;
+					width: 100vw;
+					height: 100vh;
+				}
+				.image-lightbox__img {
+					max-width: calc(100vw - 1.4rem);
+					max-height: calc(100vh - 4rem);
+				}
+			}
 		</style>
 	</head>
 
@@ -108,6 +167,49 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 				</div>
 			</article>
 		</main>
+		<dialog class="image-lightbox" aria-label="Image preview">
+			<div class="image-lightbox__panel">
+				<form method="dialog">
+					<button class="image-lightbox__button" aria-label="Close preview">Close</button>
+				</form>
+				<img class="image-lightbox__img" alt="" />
+			</div>
+		</dialog>
+		<script is:inline>
+			const dialog = document.querySelector('.image-lightbox');
+			const dialogImage = dialog?.querySelector('.image-lightbox__img');
+			const zoomableImages = document.querySelectorAll('.hero-image img, .image-card img');
+
+			if (dialog && dialogImage) {
+				const openPreview = (img) => {
+					dialogImage.src = img.currentSrc || img.src;
+					dialogImage.alt = img.alt || 'Preview image';
+					dialog.showModal();
+				};
+
+				zoomableImages.forEach((img) => {
+					img.addEventListener('click', () => openPreview(img));
+				});
+
+				dialog.addEventListener('click', (event) => {
+					const rect = dialog.getBoundingClientRect();
+					const clickedBackdrop =
+						event.clientX < rect.left ||
+						event.clientX > rect.right ||
+						event.clientY < rect.top ||
+						event.clientY > rect.bottom;
+
+					if (clickedBackdrop) {
+						dialog.close();
+					}
+				});
+
+				dialog.addEventListener('close', () => {
+					dialogImage.removeAttribute('src');
+					dialogImage.alt = '';
+				});
+			}
+		</script>
 		<Footer />
 	</body>
 </html>
