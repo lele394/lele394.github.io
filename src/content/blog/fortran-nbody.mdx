@@ -1,8 +1,8 @@
 ---
-title: "Simulating the Cosmos: High-Performance N-Body Simulation with OpenMP and OpenACC"
+title: "High-Performance N-Body Simulation with OpenMP and OpenACC"
 tags: ["HPC", "Fortran", "N-Body", "OpenMP", "GPU", "OpenACC", "Parallelization", "Scientific Computing"]
 pubDate: 2024-05-02
-description: "An in-depth exploration of building and optimizing an N-Body simulation from sequential to GPU-accelerated implementations"
+description: "An in-depth exploration of building and optimizing an N-Body simulation from sequential to GPU-accelerated implementations using Fortran, OpenMP, and OpenACC."
 ---
 
 import { Image } from 'astro:assets';
@@ -91,8 +91,8 @@ Once we validated the sequential implementation, the next logical step was paral
 #### Parallelization Strategy
 
 The key computational bottlenecks were:
-1. **Acceleration calculation** - the $O(N^2)$ pairwise interactions
-2. **Position and velocity updates** - $O(N)$ operations on all particles
+1. **Acceleration calculation**: $O(N^2)$ pairwise interactions
+2. **Position and velocity updates**: $O(N)$ operations on all particles
 
 We started by parallelizing individual loops, then optimized by merging them into a single large parallel region spanning the entire timestep iteration. This dramatically reduced thread synchronization overhead.
 
@@ -145,10 +145,10 @@ Our analysis showed that **dynamic scheduling** significantly outperformed stati
 
 <figure className="image-card image-card--wide">
   <Image src={tbSuDynamic} alt="Thread-based Speedup with Dynamic Scheduling" />
-  <figcaption>Dynamic scheduling achieves near-linear speedup up to 23 threads, closely following Amdahl's Law with an estimated 95%+ parallelization efficiency.</figcaption>
+  <figcaption>Dynamic scheduling achieves the best speedup out of the oether available options.</figcaption>
 </figure>
 
-The speedup curve closely follows Amdahl's Law until thread 23, where we observe a notable performance dip. This occurs due to hyperthreading effects on the 48-core system—the remaining virtual threads compete for shared L2 cache resources without effective cache-sharing mechanisms.
+The speedup curve closely follows Amdahl's Law until thread 23, where we observe a notable performance dip. This occurs due to hyperthreading effects on the 48-core system, the remaining virtual threads compete for shared L2 cache resources without effective cache-sharing mechanisms.
 
 #### Qualitative Validation
 
@@ -173,12 +173,12 @@ While speedup tells us how much faster we run, **efficiency** tells us how well 
 
 <figure className="image-card image-card--wide">
   <Image src={efficiency} alt="Parallel Efficiency vs Thread Count" />
-  <figcaption>Efficiency drops sharply after 24 threads due to resource contention and hyperthreading overhead. Achieving super-linear efficiency requires exceptional optimization—something rare in real applications.</figcaption>
+  <figcaption>Efficiency drops sharply after 24 threads due to resource contention and hyperthreading overhead. Achieving super-linear efficiency requires exceptional optimization,something rare in real applications.</figcaption>
 </figure>
 
 #### Fine-Tuning: Thread-Chunk Heatmaps
 
-One of the most powerful tools in our optimization arsenal was the **thread-chunk heatmap**, which visualizes execution time across different thread counts and OpenMP chunk sizes:
+One of the tools in our optimization arsenal was the **thread-chunk heatmap**, which visualizes execution time across different thread counts and OpenMP chunk sizes:
 
 <figure className="image-card image-card--wide">
   <Image src={heatDynamic} alt="Thread-Chunk Heatmap for Dynamic Scheduling" />
@@ -216,11 +216,11 @@ With GPU results in hand, we compared the MT (CPU multi-threaded) and GPU implem
 <div className="image-grid image-grid--two">
   <figure className="image-card">
     <Image src={rmsdCpuGpu} alt="RMSD Comparison: CPU MT vs GPU" />
-    <figcaption>RMSD between CPU and GPU implementations ranges 0-0.006 over 1000 timesteps—negligible differences.</figcaption>
+    <figcaption>RMSD between CPU and GPU implementations ranges 0-0.006 over 500 timesteps, negligible differences.</figcaption>
   </figure>
   <figure className="image-card">
     <Image src={stdDevCpuGpu} alt="Standard Deviation: CPU MT vs GPU" />
-    <figcaption>Standard deviation stays between 0-0.0025, confirming consistent accuracy across particle interactions.</figcaption>
+    <figcaption>Standard deviation stays between 0.0005-0.0025, confirming consistent accuracy across particle interactions.</figcaption>
   </figure>
 </div>
 
@@ -239,10 +239,10 @@ The ultimate measure of our optimization efforts is **speedup**—how much faste
 
 <figure className="image-card image-card--wide">
   <Image src={gpuCpuSpeedup} alt="GPU-CPU Speedup Comparison" />
-  <figcaption>GPU acceleration provides substantial speedup compared to both single-threaded and multi-threaded CPU implementations. Results computed on 48-core CPU with FP64 precision.</figcaption>
+  <figcaption>GPU acceleration provides substantial speedup compared to both single-threaded and multi-threaded CPU implementations. Results computed on 48-core CPU with FP64 precision. We note that FP32, which the GPU is better suited for was not tested.</figcaption>
 </figure>
 
-The GPU demonstrated significant acceleration over the multi-threaded CPU baseline, particularly for the computationally intensive acceleration calculation phase. This makes sense given GPUs' massive parallelism—while a 48-core CPU can execute 48 operations simultaneously, modern GPUs can execute thousands.
+The GPU demonstrated significant acceleration over the multi-threaded CPU baseline, particularly for the computationally intensive acceleration calculation phase. This makes sense given GPUs' massive parallelism, while a 48-core CPU can execute 48 operations simultaneously, modern GPUs can execute thousands.
 
 ---
 
@@ -265,7 +265,7 @@ We tested all three OpenMP scheduling strategies across varying thread counts an
   </figure>
   <figure className="image-card">
     <Image src={etStatic} alt="Execution Time - Static Schedule" />
-    <figcaption>Execution time comparison across scheduling strategies. Dynamic scheduling consistently delivers the best performance.</figcaption>
+    <figcaption>Execution time under static scheduling.</figcaption>
   </figure>
 </div>
 
@@ -283,7 +283,7 @@ Our heatmap analysis extended to all three scheduling types, revealing different
 
 ### What Worked Well
 
-1. **Energy conservation** as a quick validation check—it immediately revealed bugs early in development
+1. **Energy conservation** as a quick validation check. It immediately revealed bugs early in development
 2. **Progressive optimization** from sequential → MT → GPU allowed proper validation at each stage
 3. **Detailed performance profiling** (heatmaps, efficiency curves) identified optimal configurations
 4. **Pointer swapping** and **memory optimization** delivered meaningful speedups without algorithmic changes
@@ -291,8 +291,8 @@ Our heatmap analysis extended to all three scheduling types, revealing different
 
 ### Challenges and Trade-offs
 
-1. **GPU race conditions** forced us to abandon symmetry optimization—a reminder that GPU programming requires different thinking
-2. **Hyperthreading effects** limited scalability on the 48-core system beyond 23 threads
+1. **GPU race conditions** forced us to abandon symmetry optimization, a reminder that GPU programming is a different paradigm
+2. **Hyperthreading effects** limited scalability on the 48-core system beyond 23 threads due to older architecture and cache contention
 3. **Atomic operations** remain expensive even on modern GPUs, motivating the symmetry elimination strategy
 4. **Diminishing returns** from asynchronous I/O when using many threads—parallel overhead becomes significant
 
@@ -304,10 +304,7 @@ Our heatmap analysis extended to all three scheduling types, revealing different
 - **CPU Compiler**: gfortran with `-O3 -fopenmp` flags
 - **GPU Compiler**: pgfortran with `-O3 -gpu=cc75 -acc` flags
 - **Test System**: 48-core CPU, NVIDIA GPU (Compute Capability 7.5)
-- **Particle Count**: 3,000 stars
-- **Integration Steps**: 750 timesteps
 - **Integration Method**: Leapfrog (second-order accurate)
-- **Time Step**: dt = 0.005
 
 ---
 
@@ -315,11 +312,11 @@ Our heatmap analysis extended to all three scheduling types, revealing different
 
 This project demonstrates the complete journey from understanding a classical computational physics problem, through careful sequential development and validation, to multi-threaded CPU optimization, and finally to GPU acceleration. The key takeaways:
 
-1. **Never skip the sequential phase**—it's easier to parallelize correct code than to fix incorrect parallel code
-2. **Validate at every stage**—energy conservation, deviation metrics, and qualitative checks catch bugs early
-3. **Let data guide optimization**—heatmaps and performance metrics revealed optimal configurations far better than intuition
-4. **Different architectures enable different strategies**—what's optimal for CPUs (symmetry exploitation) may be suboptimal for GPUs
-5. **Modern hardware requires thought**—hyperthreading and cache hierarchies aren't free; they require careful consideration
+1. **Never skip the sequential phase**: it's easier to parallelize correct code than to fix incorrect parallel code
+2. **Validate at every stage**: energy conservation, deviation metrics, and qualitative checks catch bugs early
+3. **Let data guide optimization**: heatmaps and performance metrics revealed optimal configurations far better than intuition
+4. **Different architectures enable different strategies**: what's optimal for CPUs (symmetry exploitation) may be suboptimal for GPUs
+5. **Modern hardware requires thought**: hyperthreading and cache hierarchies aren't free; they require careful consideration
 
 The result is a simulation capable of modeling thousands of gravitational bodies with both accuracy and efficiency. Whether studying galaxy collisions, stellar dynamics, or planetary systems, this foundation can be extended to answer compelling questions about our universe.
 
