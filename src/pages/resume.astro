@@ -1,5 +1,5 @@
 ---
-import ProfileImage from '../assets/blog-placeholder-about.jpg';
+import ProfileImage from '../assets/pfp2.webp';
 import BaseHead from '../components/BaseHead.astro';
 import Footer from '../components/Footer.astro';
 import Header from '../components/Header.astro';
@@ -15,10 +15,30 @@ import { SITE_TITLE } from '../consts';
 				display: grid;
 				grid-template-columns: 140px 1fr;
 				gap: 1rem;
-				align-items: center;
+				align-items: flex-start;
 				border: 1px solid var(--border);
 				background: var(--surface);
 				padding: 1rem;
+			}
+			body.resume-page .resume-hero-content {
+				display: flex;
+				flex-direction: column;
+				gap: 0.5rem;
+			}
+			body.resume-page .resume-hero-actions {
+				display: flex;
+				gap: 0.5rem;
+				align-items: center;
+				margin-top: 0.5rem;
+			}
+			body.resume-page .resume-hero-actions a {
+				font-size: 0.9rem;
+				color: var(--accent);
+				border-bottom: 1px solid transparent;
+				transition: border-color 120ms ease;
+			}
+			body.resume-page .resume-hero-actions a:hover {
+				border-bottom-color: var(--accent);
 			}
 			body.resume-page .resume-hero img {
 				border: 1px solid var(--border);
@@ -65,10 +85,15 @@ import { SITE_TITLE } from '../consts';
 		<main>
 			<section class="resume-hero">
 				<img src={ProfileImage.src} alt="Profile placeholder" width="140" height="140" />
-				<div>
-					<h1>Léo Bechet</h1>
-					<p class="role">PhD Researcher · Scientific Computing · Computational Physics</p>
-					<p class="meta">Uppsala, Sweden · +33 7 81 25 10 39 · lele.bechet@gmail.com · github.com/lele394</p>
+				<div class="resume-hero-content">
+					<div>
+						<h1>Léo Bechet</h1>
+						<p class="role">PhD Student · Scientific Computing · Computational Physics</p>
+						<p class="meta">Uppsala, Sweden · +33 7 81 25 10 39 · lele.bechet@gmail.com · github.com/lele394</p>
+					</div>
+					<div class="resume-hero-actions">
+						<a href="/resume.pdf" download>↓ Download PDF resume</a>
+					</div>
 				</div>
 			</section>
 
