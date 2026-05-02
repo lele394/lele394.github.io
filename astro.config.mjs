@@ -13,6 +13,11 @@ export default defineConfig({
 	base: '/',
 	integrations: [mdx(), sitemap()],
 	markdown: {
+		shikiConfig: {
+			langAlias: {
+				fortran: 'fortran-free-form',
+			},
+		},
 		remarkPlugins: [remarkMath],
 		rehypePlugins: [rehypeKatex, rehypePrism],
 	},
