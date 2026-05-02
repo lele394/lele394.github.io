@@ -28,7 +28,7 @@ const posts = (await getCollection('blog')).sort(
 			}
 			label {
 				font-size: 0.9rem;
-				color: var(--secondary-text);
+				color: var(--muted);
 			}
 			#search {
 				background: var(--surface);
@@ -40,7 +40,7 @@ const posts = (await getCollection('blog')).sort(
 			#active-tag {
 				border: 1px solid var(--border);
 				background: transparent;
-				color: var(--secondary-text);
+				color: var(--muted);
 				padding: 0.45rem 0.7rem;
 				display: none;
 				cursor: pointer;
@@ -57,7 +57,7 @@ const posts = (await getCollection('blog')).sort(
 				display: none;
 				padding: 1rem;
 				border: 1px dashed var(--border);
-				color: var(--secondary-text);
+				color: var(--muted);
 			}
 			.empty-state.visible {
 				display: block;
