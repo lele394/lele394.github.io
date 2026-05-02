@@ -144,3 +144,62 @@ th, td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); text-a
 
 .post-meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
 
+
+/* Improved, broad codeblock / syntax highlighting styles
+	 Targets: Shiki output (.shiki), Prism-like language classes (language-*/language-*),
+	 and plain Markdown code blocks (<pre><code>). */
+
+/* High-specificity base for any pre/code pair */
+pre[class*="language-"],
+code[class*="language-"],
+pre, pre > code,
+.shiki, pre.shiki, pre.shiki > code {
+	background: #0b1220 !important; /* dark surface for code */
+	color: #e6eef6 !important; /* fallback text color */
+	border: 1px solid rgba(11,18,32,0.12) !important;
+	border-radius: 8px !important;
+	padding: 0.8rem 1rem !important;
+	font-family: var(--font-mono) !important;
+	font-size: 0.95rem !important;
+	line-height: 1.45 !important;
+	overflow: auto !important;
+	-webkit-font-smoothing: antialiased;
+}
+
+/* Ensure code text does not appear faded by removing opacity inheritance */
+pre, pre * { opacity: 1 !important; }
+
+/* Override Astro-generated inline-styled code blocks (github-dark, astro-code, code-highlight) */
+pre.astro-code, pre.astro-code.github-dark, pre.astro-code.github-dark > code.code-highlight,
+.astro-code, .code-highlight {
+	background-color: #0b1220 !important;
+	border-color: rgba(230,238,246,0.06) !important;
+}
+
+/* Line container styling for Shiki/Prism rendered content */
+.shiki .line, pre.shiki .line, pre > code > .line { display: block; padding-left: 0.9rem; padding-right: 0.9rem; }
+.shiki .line:not(:last-child), pre.shiki .line:not(:last-child) { margin-bottom: 0.08rem; }
+
+/* Line numbers (if present) */
+.shiki .line-number, pre .line-number { display: inline-block; width: 3.2rem; text-align: right; padding-right: 1rem; margin-left: -1.9rem; color: rgba(230,238,246,0.28); user-select: none; }
+
+/* Common token color fallbacks (Shiki/Prism token classes) */
+.token.comment, .token.prolog, .token.doctype, .token.cdata { color: #7a869a; font-style: italic; }
+.token.keyword { color: #ff7ab6; }
+.token.selector { color: #ffd580; }
+.token.function { color: #60c5ff; }
+.token.tag { color: #ffb86b; }
+.token.attr-name { color: #ffd580; }
+.token.string { color: #9ae66e; }
+.token.number, .token.boolean { color: #f59e0b; }
+.token.operator { color: #e6eef6; }
+.token.punctuation { color: #c6cbd1; }
+
+/* Inline code on prose backgrounds */
+p code, li code, dd code { background: rgba(230,238,246,0.06); padding: 2px 6px; border-radius: 4px; color: #0b1220; }
+
+@media (max-width: 480px) {
+	pre[class*="language-"], pre.shiki, pre > code { font-size: 0.82rem; padding: 0.6rem 0.75rem; }
+	.shiki .line-number, pre .line-number { width: 2.6rem; padding-right: 0.6rem; margin-left: -1.2rem; }
+}
+

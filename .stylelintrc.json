@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "at-rule-no-unknown": [true, { "ignoreAtRules": ["katex"] }],
+    "selector-max-id": 1,
+    "string-quotes": "double",
+    "indentation": 1
+  }
+}
