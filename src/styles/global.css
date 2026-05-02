@@ -198,6 +198,58 @@ pre.astro-code, pre.astro-code.github-dark, pre.astro-code.github-dark > code.co
 /* Inline code on prose backgrounds */
 p code, li code, dd code { background: rgba(230,238,246,0.06); padding: 2px 6px; border-radius: 4px; color: #0b1220; }
 
+/* Responsive image cards used by the N-body writeup and similar posts */
+.image-grid {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1rem;
+	margin: 1.25rem 0 1.75rem;
+}
+
+.image-grid--two .image-card {
+	flex: 1 1 320px;
+}
+
+.image-grid--three .image-card {
+	flex: 1 1 240px;
+}
+
+.image-card {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	margin: 0 auto;
+	padding: 0.55rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-soft);
+	background: var(--surface);
+	box-shadow: var(--shadow-sm);
+	flex: 1 1 auto;
+	max-width: fit-content;
+	max-width: 450px;
+	max-height: 450px;
+}
+
+.image-card :is(img, picture) {
+	display: block;
+	max-width: 400px;
+	max-height: 400px;
+	height: auto;
+	object-fit: contain;
+}
+
+.image-card figcaption {
+	margin-top: 0.55rem;
+	color: var(--muted);
+	font-size: 0.92rem;
+	line-height: 1.45;
+	text-align: center;
+}
+
+@media (max-width: 720px) {
+	.image-grid { gap: 0.75rem; }
+}
+
 @media (max-width: 480px) {
 	pre[class*="language-"], pre.shiki, pre > code { font-size: 0.82rem; padding: 0.6rem 0.75rem; }
 	.shiki .line-number, pre .line-number { width: 2.6rem; padding-right: 0.6rem; margin-left: -1.2rem; }

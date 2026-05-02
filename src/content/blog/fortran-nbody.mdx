@@ -1,0 +1,340 @@
+---
+title: "Simulating the Cosmos: High-Performance N-Body Simulation with OpenMP and OpenACC"
+tags: ["HPC", "Fortran", "N-Body", "OpenMP", "GPU", "OpenACC", "Parallelization", "Scientific Computing"]
+pubDate: 2024-05-02
+description: "An in-depth exploration of building and optimizing an N-Body simulation from sequential to GPU-accelerated implementations"
+---
+
+import { Image } from 'astro:assets';
+import eCon from '../../assets/blog/nbody_fortran_writeup/images/graph/E_con.png';
+import tbSuDynamic from '../../assets/blog/nbody_fortran_writeup/images/graph/TB_SU_ref-dynamic.png';
+import rmsd from '../../assets/blog/nbody_fortran_writeup/images/graph/RMSD.png';
+import stdDev from '../../assets/blog/nbody_fortran_writeup/images/graph/std_dev.png';
+import efficiency from '../../assets/blog/nbody_fortran_writeup/images/graph/Efficiency.png';
+import heatDynamic from '../../assets/blog/nbody_fortran_writeup/images/graph/Heat_dynamic.png';
+import rmsdCpuGpu from '../../assets/blog/nbody_fortran_writeup/images/graph/RMSD_CPU-GPU.png';
+import stdDevCpuGpu from '../../assets/blog/nbody_fortran_writeup/images/graph/std-dev_CPU_GPU.png';
+import eGpuCpu from '../../assets/blog/nbody_fortran_writeup/images/graph/E_GPUCPU.png';
+import gpuCpuSpeedup from '../../assets/blog/nbody_fortran_writeup/images/GPU-CPU_speedup.png';
+import etDynamic from '../../assets/blog/nbody_fortran_writeup/images/annexe/ET_dynamic.png';
+import etGuided from '../../assets/blog/nbody_fortran_writeup/images/annexe/ET_guided.png';
+import etStatic from '../../assets/blog/nbody_fortran_writeup/images/annexe/ET_static.png';
+
+## Introduction
+
+One of the most fundamental problems in computational astronomy and physics is the **N-Body Problem**: simulating the gravitational interactions between multiple bodies over time. From predicting planetary orbits to modeling galaxy dynamics, N-Body simulations are essential tools for understanding the universe. However, simulating even thousands of objects quickly becomes computationally intensive, making this an ideal testbed for exploring high-performance computing techniques.
+
+This project presents a complete journey from a straightforward sequential implementation to a highly optimized multi-threaded CPU version and finally to GPU acceleration using modern parallel computing frameworks. Along the way, we'll explore the critical techniques needed to maintain accuracy, validate correctness, and squeeze every bit of performance out of modern heterogeneous hardware.
+
+---
+
+## Understanding the N-Body Problem
+
+### The Physics
+
+At the heart of any N-Body simulation lies Newton's law of universal gravitation. For each body $i$ in the system, we calculate the acceleration caused by all other bodies:
+
+$$\mathbf{a}_i = G \sum_{j \neq i} \frac{m_j (\mathbf{r}_j - \mathbf{r}_i)}{\|\mathbf{r}_j - \mathbf{r}_i\|^3}$$
+
+where:
+- $\mathbf{a}_i$ is the acceleration of body $i$
+- $G$ is the gravitational constant
+- $m_j$ is the mass of body $j$
+- $\mathbf{r}_i$ and $\mathbf{r}_j$ are the positions of bodies $i$ and $j$
+
+The computational complexity here is crucial: for $N$ bodies, calculating all pairwise interactions requires $O(N^2)$ operations per timestep. With thousands of bodies and hundreds of integration steps, even a simple sequential implementation can take significant time.
+
+### Numerical Integration: The Leapfrog Method
+
+To accurately evolve the system forward in time, we use the **leapfrog integration method**, which provides excellent stability and accuracy for long-term simulations. The method consists of two steps:
+
+**Position Update:**
+$$\mathbf{r}_i(t + \Delta t) = \mathbf{r}_i(t) + \mathbf{v}_i(t) \Delta t + \frac{1}{2} \mathbf{a}_i(t) \Delta t^2$$
+
+**Velocity Update:**
+$$\mathbf{v}_i(t + \Delta t) = \mathbf{v}_i(t) + \frac{\mathbf{a}_i(t) + \mathbf{a}_i(t + \Delta t)}{2} \Delta t$$
+
+This approach ensures numerical stability while maintaining the physical principles governing the system.
+
+---
+
+## Implementation Journey
+
+### Phase 1: Sequential Implementation
+
+Before optimizing anything, we needed a solid, correct sequential baseline. The sequential implementation serves several critical purposes:
+
+1. **Validation** of the mathematical model and algorithms
+2. **Debugging** without the complexity of parallel programming
+3. **Performance baseline** for speedup calculations
+4. **Energy conservation verification** to ensure simulation accuracy
+
+The sequential code was implemented in Fortran, a natural choice for computational physics given its mature compiler optimizations and efficient handling of numerical computations.
+
+<figure className="image-card image-card--wide">
+  <Image src={eCon} alt="Energy Conservation Over Time" />
+  <figcaption>Energy remains perfectly conserved throughout the sequential simulation, validating the correctness of our leapfrog integrator.</figcaption>
+</figure>
+
+The figure above shows one of our key validation metrics: **energy conservation**. Over hundreds of timesteps, the total energy (kinetic + potential) remains constant, confirming that our numerical methods accurately preserve the physical principles of the system.
+
+---
+
+### Phase 2: Multi-Threaded CPU Acceleration with OpenMP
+
+Once we validated the sequential implementation, the next logical step was parallelization. We chose OpenMP for CPU parallelization because it's:
+- Widely supported across compilers
+- Relatively easy to implement with compiler directives
+- Flexible in optimization strategies
+- Part of the Fortran standard
+
+#### Parallelization Strategy
+
+The key computational bottlenecks were:
+1. **Acceleration calculation** - the $O(N^2)$ pairwise interactions
+2. **Position and velocity updates** - $O(N)$ operations on all particles
+
+We started by parallelizing individual loops, then optimized by merging them into a single large parallel region spanning the entire timestep iteration. This dramatically reduced thread synchronization overhead.
+
+#### Variable Management
+
+Proper scoping of variables was critical. In our final implementation, we used `default(none)` clauses to explicitly declare all variables as either private or shared, eliminating subtle bugs from unintended data sharing.
+
+**Key private variables** for the acceleration computation:
+- Loop indices
+- Temporary distance and force vectors
+- Energy caching variables
+
+**Shared variables** mainly consisted of the position, velocity, and acceleration arrays.
+
+#### Optimization Techniques
+
+Beyond basic parallelization, we implemented several advanced optimizations:
+
+**1. Pointer Swapping (No Data Copying)**
+```fortran
+subroutine swap_array(old, new)
+    real(kind=8), allocatable, intent(inout) :: old(:,:), new(:,:)
+    real(kind=8), allocatable :: temp(:,:)
+    
+    call move_alloc(from=old, to=temp)
+    call move_alloc(from=new, to=old)
+    call move_alloc(from=temp, to=new)
+end subroutine swap_array
+```
+
+Rather than copying data when advancing to the next timestep, we swap pointers using Fortran's `move_alloc()`, eliminating expensive memory operations.
+
+**2. Minimal Memory Footprint**
+We reduced array usage to just four: positions, velocities, current accelerations, and next-step accelerations. This minimizes cache pressure and memory bandwidth consumption.
+
+**3. Cache Optimization**
+Position caching for the currently computed star and force vector caching further reduce memory access patterns, allowing the processor to work more efficiently with its cache hierarchy.
+
+**4. I/O Optimization**
+Using unformatted (binary) output instead of formatted text eliminates formatting overhead. Combined with asynchronous writes, we achieved a ~33% reduction in total execution time when using fewer threads than available cores.
+
+#### Scheduling Analysis
+
+OpenMP provides three scheduling strategies for distributing work:
+- **Static**: Divide iterations evenly among threads (good for uniform workloads)
+- **Guided**: Dynamically reduce chunk size over time (good for load balancing)
+- **Dynamic**: Assign work on-demand (most flexible but higher overhead)
+
+Our analysis showed that **dynamic scheduling** significantly outperformed static and guided approaches:
+
+<figure className="image-card image-card--wide">
+  <Image src={tbSuDynamic} alt="Thread-based Speedup with Dynamic Scheduling" />
+  <figcaption>Dynamic scheduling achieves near-linear speedup up to 23 threads, closely following Amdahl's Law with an estimated 95%+ parallelization efficiency.</figcaption>
+</figure>
+
+The speedup curve closely follows Amdahl's Law until thread 23, where we observe a notable performance dip. This occurs due to hyperthreading effects on the 48-core system—the remaining virtual threads compete for shared L2 cache resources without effective cache-sharing mechanisms.
+
+#### Qualitative Validation
+
+We compared single-threaded (ST) and multi-threaded (MT) implementations to ensure vectorization didn't introduce errors:
+
+<div className="image-grid image-grid--two">
+  <figure className="image-card">
+    <Image src={rmsd} alt="Root Mean Square Deviation (ST vs MT)" />
+    <figcaption>RMSD between ST and MT implementations ranges from 0 to 0.005, demonstrating negligible numerical differences.</figcaption>
+  </figure>
+  <figure className="image-card">
+    <Image src={stdDev} alt="Standard Deviation (ST vs MT)" />
+    <figcaption>Standard deviation between implementations stays between 0 and 0.002, showing consistent, minimal errors across particles.</figcaption>
+  </figure>
+</div>
+
+These metrics validate that multi-threading preserves the physical accuracy of our simulation.
+
+#### Efficiency and Resource Utilization
+
+While speedup tells us how much faster we run, **efficiency** tells us how well we're using our hardware resources:
+
+<figure className="image-card image-card--wide">
+  <Image src={efficiency} alt="Parallel Efficiency vs Thread Count" />
+  <figcaption>Efficiency drops sharply after 24 threads due to resource contention and hyperthreading overhead. Achieving super-linear efficiency requires exceptional optimization—something rare in real applications.</figcaption>
+</figure>
+
+#### Fine-Tuning: Thread-Chunk Heatmaps
+
+One of the most powerful tools in our optimization arsenal was the **thread-chunk heatmap**, which visualizes execution time across different thread counts and OpenMP chunk sizes:
+
+<figure className="image-card image-card--wide">
+  <Image src={heatDynamic} alt="Thread-Chunk Heatmap for Dynamic Scheduling" />
+  <figcaption>The heatmap reveals optimal configurations: the darkest regions represent fastest execution times. The optimal setup was 23 threads with chunk size 50, achieving 0.36 seconds execution time.</figcaption>
+</figure>
+
+The sharp demarcation line visible in the heatmap shows the "wall" beyond which performance degrades due to thread over-subscription. The consistent slowdown at 10 threads (visible as a horizontal stripe) suggests additional system-level constraints.
+
+The optimal configuration was identified as:
+```bash
+export OMP_SCHEDULE="dynamic,50"
+export OMP_NUM_THREADS=23
+```
+---
+
+### Phase 3: GPU Acceleration with OpenACC
+
+GPU acceleration represented the next frontier. We chose OpenACC for GPU porting because:
+- It maintains similar syntax to OpenMP, easing the transition
+- It abstracts away lower-level GPU programming details
+- It's well-suited for computational kernels like N-Body
+
+#### GPU Porting Challenges
+
+The transition to GPU computing introduced a critical challenge: **race conditions**. In the original MT code, we exploited the symmetry of Newton's third law ($\mathbf{F}_{ij} = -\mathbf{F}_{ji}$) to reduce computation. However, this symmetry created data races when parallelizing across GPU threads.
+
+**The Solution**: We eliminated the symmetry, computing all $N^2$ interactions explicitly. While this increases computation by a factor of ~2, it allows each GPU thread to maintain private force vectors—updating accelerations without atomic operations.
+
+This trade-off is favorable for GPU architectures, where atomic operations cause significant performance penalties compared to CPUs.
+
+#### GPU Validation
+
+With GPU results in hand, we compared the MT (CPU multi-threaded) and GPU implementations using the same metrics:
+
+<div className="image-grid image-grid--two">
+  <figure className="image-card">
+    <Image src={rmsdCpuGpu} alt="RMSD Comparison: CPU MT vs GPU" />
+    <figcaption>RMSD between CPU and GPU implementations ranges 0-0.006 over 1000 timesteps—negligible differences.</figcaption>
+  </figure>
+  <figure className="image-card">
+    <Image src={stdDevCpuGpu} alt="Standard Deviation: CPU MT vs GPU" />
+    <figcaption>Standard deviation stays between 0-0.0025, confirming consistent accuracy across particle interactions.</figcaption>
+  </figure>
+</div>
+
+<figure className="image-card image-card--wide">
+  <Image src={eGpuCpu} alt="Energy Comparison: CPU MT vs GPU" />
+  <figcaption>Energy curves from CPU and GPU implementations are essentially identical, validating GPU correctness.</figcaption>
+</figure>
+
+These results confirm that the GPU implementation maintains the same level of accuracy as the CPU version, with acceptable numerical precision (double precision, FP64).
+
+---
+
+## Performance Results: CPU vs GPU
+
+The ultimate measure of our optimization efforts is **speedup**—how much faster can we run simulations?
+
+<figure className="image-card image-card--wide">
+  <Image src={gpuCpuSpeedup} alt="GPU-CPU Speedup Comparison" />
+  <figcaption>GPU acceleration provides substantial speedup compared to both single-threaded and multi-threaded CPU implementations. Results computed on 48-core CPU with FP64 precision.</figcaption>
+</figure>
+
+The GPU demonstrated significant acceleration over the multi-threaded CPU baseline, particularly for the computationally intensive acceleration calculation phase. This makes sense given GPUs' massive parallelism—while a 48-core CPU can execute 48 operations simultaneously, modern GPUs can execute thousands.
+
+---
+
+## Advanced Performance Analysis
+
+Beyond basic speedup measurements, we conducted detailed performance characterization:
+
+### Scheduling Strategy Comparison
+
+We tested all three OpenMP scheduling strategies across varying thread counts and chunk sizes:
+
+<div className="image-grid image-grid--three">
+  <figure className="image-card">
+    <Image src={etDynamic} alt="Execution Time - Dynamic Schedule" />
+    <figcaption>Execution time under dynamic scheduling.</figcaption>
+  </figure>
+  <figure className="image-card">
+    <Image src={etGuided} alt="Execution Time - Guided Schedule" />
+    <figcaption>Execution time under guided scheduling.</figcaption>
+  </figure>
+  <figure className="image-card">
+    <Image src={etStatic} alt="Execution Time - Static Schedule" />
+    <figcaption>Execution time comparison across scheduling strategies. Dynamic scheduling consistently delivers the best performance.</figcaption>
+  </figure>
+</div>
+
+### Thread Scaling Analysis
+
+Our heatmap analysis extended to all three scheduling types, revealing different behaviors:
+
+- **Static scheduling** shows a sharp performance cliff and higher overall execution times
+- **Guided scheduling** provides moderate improvement but less consistent scaling
+- **Dynamic scheduling** maintains better performance across a wider range of thread counts
+
+---
+
+## Lessons Learned
+
+### What Worked Well
+
+1. **Energy conservation** as a quick validation check—it immediately revealed bugs early in development
+2. **Progressive optimization** from sequential → MT → GPU allowed proper validation at each stage
+3. **Detailed performance profiling** (heatmaps, efficiency curves) identified optimal configurations
+4. **Pointer swapping** and **memory optimization** delivered meaningful speedups without algorithmic changes
+5. **Testing scheduling strategies** systematically revealed unexpected dynamic scheduling advantages
+
+### Challenges and Trade-offs
+
+1. **GPU race conditions** forced us to abandon symmetry optimization—a reminder that GPU programming requires different thinking
+2. **Hyperthreading effects** limited scalability on the 48-core system beyond 23 threads
+3. **Atomic operations** remain expensive even on modern GPUs, motivating the symmetry elimination strategy
+4. **Diminishing returns** from asynchronous I/O when using many threads—parallel overhead becomes significant
+
+---
+
+## Technical Specifications
+
+- **Language**: Fortran
+- **CPU Compiler**: gfortran with `-O3 -fopenmp` flags
+- **GPU Compiler**: pgfortran with `-O3 -gpu=cc75 -acc` flags
+- **Test System**: 48-core CPU, NVIDIA GPU (Compute Capability 7.5)
+- **Particle Count**: 3,000 stars
+- **Integration Steps**: 750 timesteps
+- **Integration Method**: Leapfrog (second-order accurate)
+- **Time Step**: dt = 0.005
+
+---
+
+## Conclusion
+
+This project demonstrates the complete journey from understanding a classical computational physics problem, through careful sequential development and validation, to multi-threaded CPU optimization, and finally to GPU acceleration. The key takeaways:
+
+1. **Never skip the sequential phase**—it's easier to parallelize correct code than to fix incorrect parallel code
+2. **Validate at every stage**—energy conservation, deviation metrics, and qualitative checks catch bugs early
+3. **Let data guide optimization**—heatmaps and performance metrics revealed optimal configurations far better than intuition
+4. **Different architectures enable different strategies**—what's optimal for CPUs (symmetry exploitation) may be suboptimal for GPUs
+5. **Modern hardware requires thought**—hyperthreading and cache hierarchies aren't free; they require careful consideration
+
+The result is a simulation capable of modeling thousands of gravitational bodies with both accuracy and efficiency. Whether studying galaxy collisions, stellar dynamics, or planetary systems, this foundation can be extended to answer compelling questions about our universe.
+
+---
+
+## References & Resources
+
+- Sequential implementation with validation
+- OpenMP parallelization with performance analysis
+- OpenACC GPU port for accelerated computation
+- Comprehensive performance profiling and optimization techniques
+- All code available in the project repository
+
+For more technical details, hardware specifications, and reproducible benchmarks, refer to the complete project report accompanying this work.
+
+---
+
+*This project was developed as part of the High-Performance Computation course in the Master's program in Computational Physics at the University of Bourgogne Franche-Comté.*
