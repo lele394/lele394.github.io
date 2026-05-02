@@ -1,188 +1,124 @@
 @import "katex/dist/katex.min.css";
 
 :root {
-	--color-background: #0a121a;
-	--color-highlight: #ef9e65;
-	--color-text: #e3d2f1;
-	--background: var(--color-background);
-	--surface: #0d1f25;
-	--text: var(--color-text);
-	--secondary-text: #b9a3d4;
-	--accent: var(--color-highlight);
-	--border: #2a5665;
-	--layout-max-width: 1120px;
-	--reading-max-width: 980px;
-	
-	--black: 212, 193, 236;
-	--gray: 185, 163, 212;
-	--gray-light: 42, 86, 101;
-	--gray-dark: 212, 193, 236;
-	--box-shadow: none;
+	--font-mono: "Berkeley Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+	--bg: #f6f7f9;
+	--surface: #ffffff;
+	--muted: #6b7280;
+	--text: #0f1724;
+	--accent: #2563eb; /* scholarly blue */
+	--accent-2: #0ea5a4;
+	--border: #e6e9ee;
+	--radius: 4px;
+	--radius-soft: 8px;
+	--layout-max-width: 1100px;
+	--reading-max-width: 760px;
+	--code-bg: #f3f4f6;
+	--shadow-sm: 0 1px 4px rgba(16,24,40,0.04);
+}
+
+html, body {
+	height: 100%;
 }
 
 body {
-	font-family: "Berkeley Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+	font-family: var(--font-mono);
 	margin: 0;
 	padding: 0;
-	text-align: left;
-	background: var(--background);
-	word-wrap: break-word;
-	overflow-wrap: break-word;
+	background: var(--bg);
 	color: var(--text);
-	font-size: 18px;
-	line-height: 1.65;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	font-size: 17px;
+	line-height: 1.6;
+	-webkit-font-variant-ligatures: none;
 }
 
+/* Layout */
 main {
-	width: var(--layout-max-width);
-	max-width: calc(100% - 2em);
-	margin: auto;
-	padding: 2.5em 1em;
+	max-width: var(--layout-max-width);
+	width: 100%;
+	margin: 48px auto;
+	padding: 0 20px;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+.container {
+	max-width: var(--reading-max-width);
+	margin: 0 auto;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
 	margin: 0 0 0.5rem 0;
 	color: var(--text);
-	line-height: 1.2;
+	line-height: 1.15;
 }
 
-h1 {
-	font-size: 2.5em;
-}
+h1 { font-size: 2.1rem; letter-spacing: -0.02em; font-weight: 700; }
+h2 { font-size: 1.45rem; margin-top: 0.7rem; font-weight: 600; }
+h3 { font-size: 1.05rem; font-weight: 600; }
 
-h2 {
-	font-size: 1.8em;
-}
+/* Text elements */
+p { margin: 0 0 1rem 0; color: #0b1220; }
+.prose { color: #0b1220; }
 
-h3 {
-	font-size: 1.4em;
-}
+strong, b { color: var(--text); font-weight: 700; }
 
-h4 {
-	font-size: 1.1em;
-}
+a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; transition: all 160ms ease; }
+a:hover { color: color-mix(in srgb, var(--accent) 80%, black); border-bottom-color: rgba(37,99,235,0.12); }
 
-h5 {
-	font-size: 1.25em;
-}
+/* Inputs */
+input, textarea, select { font-family: var(--font-mono); font-size: 15px; color: var(--text); }
 
-strong,
-b {
-	font-weight: 700;
-	color: var(--accent);
-}
+/* Images and media */
+img { max-width: 100%; height: auto; border-radius: 2px; display: block; }
 
-a {
-	color: var(--accent);
-	text-decoration: none;
-}
+/* Code and preformatted */
+code { background: var(--code-bg); padding: 3px 6px; border-radius: 3px; font-size: 0.95em; }
+pre { background: var(--code-bg); padding: 0.9rem 1rem; border-radius: 4px; overflow: auto; border: 1px solid var(--border); box-shadow: none; }
+pre > code { display: block; white-space: pre; }
 
-a:hover {
-	text-decoration: underline;
-}
+/* Blockquote */
+blockquote { margin: 0; padding: 0.65rem 0.8rem; background: transparent; border-left: 3px solid var(--accent); border-radius: 0; color: var(--muted); }
 
-p {
-	margin-bottom: 1em;
-}
+/* Horizontal rule */
+hr { border: none; height: 1px; background: var(--border); margin: 2rem 0; }
 
-.prose p {
-	margin-bottom: 1.2em;
-}
+/* Tables */
+table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+th, td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); text-align: left; }
 
-textarea {
-	width: 100%;
-	font-size: 16px;
-}
+/* Utility */
+.card { background: var(--surface); border-radius: var(--radius); padding: 1rem; box-shadow: none; border: 1px solid var(--border); }
 
-input {
-	font-size: 16px;
-}
+.muted { color: var(--muted); }
 
-table {
-	width: 100%;
-	border-collapse: collapse;
-}
+.readable { max-width: var(--reading-max-width); margin: 0 auto; }
 
-th,
-td {
-	border: 1px solid var(--border);
-	padding: 0.5rem;
-}
+/* Accessibility helpers */
+.sr-only { position: absolute !important; height: 1px; width: 1px; overflow: hidden; clip: rect(1px, 1px, 1px, 1px); white-space: nowrap; }
 
-img {
-	max-width: 100%;
-	height: auto;
-	border-radius: 4px;
-}
+/* KaTeX */
+.katex, .katex-display { color: var(--text); }
+.katex-display { overflow-x: auto; padding: 0.25rem 0; }
 
-code {
-	padding: 2px 5px;
-	background-color: var(--surface);
-	border-radius: 2px;
-}
-
-pre {
-	padding: 1.5em;
-	border-radius: 4px;
-	border: 1px solid var(--border);
-	background: var(--surface);
-}
-
-pre > code {
-	all: unset;
-}
-
-blockquote {
-	border-left: 4px solid var(--accent);
-	padding: 0 0 0 20px;
-	margin: 0;
-	color: var(--secondary-text);
-}
-
-hr {
-	border: none;
-	border-top: 1px solid var(--border);
-}
-
+/* Responsive adjustments */
 @media (max-width: 720px) {
-	body {
-		font-size: 18px;
-	}
-	main {
-		padding: 1em;
-	}
+	body { font-size: 16px; }
+	main { margin: 28px auto; }
+	h1 { font-size: 1.5rem; }
 }
 
-.sr-only {
-	border: 0;
-	padding: 0;
-	margin: 0;
-	position: absolute !important;
-	height: 1px;
-	width: 1px;
-	overflow: hidden;
-	/* IE6, IE7 - a 0 height clip, off to the bottom right of the visible 1px box */
-	clip: rect(1px 1px 1px 1px);
-	/* maybe deprecated but we need to support legacy browsers */
-	clip: rect(1px, 1px, 1px, 1px);
-	/* modern browsers, clip-path works inwards from each corner */
-	clip-path: inset(50%);
-	/* added line to stop words getting smushed together (as they go onto separate lines and some screen readers do not understand line feeds as a space */
-	white-space: nowrap;
-}
+/* Small helpers for blog list / cards */
+.card-list { display: grid; grid-template-columns: 1fr; gap: 18px; }
+@media (min-width: 880px) { .card-list { grid-template-columns: repeat(2, 1fr); gap: 20px; } }
 
-.katex,
-.katex-display {
-	color: var(--text);
-}
+/* Forms and buttons */
+.btn { display: inline-block; padding: 8px 12px; border-radius: 3px; background: var(--accent); color: white; text-decoration: none; font-weight: 600; border: none; }
+.btn.secondary { background: transparent; color: var(--accent); border: 1px solid var(--border); border-radius: 3px; }
 
-.katex-display {
-	overflow-x: auto;
-	overflow-y: hidden;
-	padding: 0.25rem 0;
-}
+/* Make headings and major containers feel more structured (sharp + small soft corners) */
+.site-header, .site-footer { border-radius: 0; background: transparent; }
+
+.post-meta { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
+
