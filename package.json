@@ -19,6 +19,7 @@
     "astro": "^6.0.3",
     "katex": "^0.16.38",
     "rehype-katex": "^7.0.1",
+    "rehype-mermaid": "^3.0.0",
     "remark-math": "^6.0.0",
     "sharp": "^0.34.3"
   },
@@ -26,6 +27,7 @@
     "@mdx-js/eslint": "github:mdx-js/eslint-mdx",
     "eslint": "^8.57.1",
     "eslint-plugin-mdx": "^3.7.0",
+    "playwright": "^1.60.0",
     "rehype-prism-plus": "^2.0.2"
   }
 }
