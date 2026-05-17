@@ -1,0 +1,137 @@
+---
+title: "Reading Notes : Quantifying the Energy Cost of Performance Inefficiency in HPC Applications"
+description: "Reading notes based on DOI 10.1145/3784828.3785251"
+pubDate: 2026-05-14
+tags: ["math", "python", "low-level", "floating-point"]
+---
+
+These notes are related to the paper [Quantifying the Energy Cost of Performance Inefficiency in HPC Applications](https://dl.acm.org/doi/10.1145/3784828.3785251). All credits go to the original authors. This work is personal and may contain errors, please refer to the original paper for accurate information.
+
+---
+
+## Part 1: Executive Summary & Core Problem
+
+### 1.1. Motivation
+The drive towards Exascale computing is limited by a significant power wall. Simply building bigger, faster machines is not sustainable due to enormous energy consumption. This has created an urgent need for more energy-efficient computational methods. (eg. AI bubble)
+
+### 1.2. The Challenge
+Mixed-precision computing (MXP), using a mix of high-precision (`fp64`) and low-precision (`fp32`, `fp16`) arithmetic, is a promising solution. Lower precision requires less memory, less data movement, and less energy per operation. However, naively converting code to lower precision can lead to catastrophic failures:
+*   Loss of accuracy, yielding incorrect results.
+*   Numerical instability, causing iterative solvers to stagnate or diverge.
+Identifying which parts of a complex scientific code can be safely converted is a non-trivial, expert-driven, and time-consuming task.
+
+### 1.3. The Proposed Solutionz
+The paper presents a *systematic, tool-driven methodology* to safely and effectively enable mixed-precision in complex applications. It bridges the gap between algorithmic theory and practical implementation using specialized tools to automate the analysis of numerical precision and stability.
+
+### 1.4. Key Contributions
+*   A systematic methodology for enabling MXP in CFD codes using the *Verificarlo* tool to pinpoint kernels for precision reduction.
+*   Analysis of the `Nekbone` code, showing that running the Conjugate Gradient (CG) solver in `fp32` while keeping critical operations in `fp64` can reduce time-to-solution by up to **1.62x** and energy-to-solution by up to **2.43x**.
+*   Extension of this strategy to the modern CFD application `Neko`, achieving up to **1.3x** reduction in both time and energy while matching `fp64` accuracy.
+*   Validation on European HPC systems (LUMI, MareNostrum 5), highlighting energy-to-solution as a key performance metric.
+
+---
+
+## Part 2: Foundational Concepts & Tooling
+
+### 2.1. Floating-Point Arithmetic (FP)
+*   **Double Precision (`fp64`):** 64 bits. High accuracy, wide dynamic range. The standard for scientific computing. **Costly** in terms of memory, bandwidth, and energy.
+*   **Single Precision (`fp32`):** 32 bits. Lower accuracy, smaller range. **Cheaper**, faster, and more energy-efficient.
+*   **The Trade-off:** The core goal of MXP is to use `fp32` wherever possible for performance and `fp64` only where necessary for accuracy and stability.
+
+### 2.2. The Verificarlo Tool
+This is the cornerstone of the methodology. It's an open-source tool built on the LLVM compiler that instruments FP operations to analyze their behavior.
+
+*   **How it Works:** At compile time, it replaces standard FP operations (`+`, `*`, etc.) with custom function calls. At runtime, these calls are handled by different backends to simulate various FP behaviors.
+*   **Key Backends Used:**
+    *   **VPREC (Variable Precision):**
+        *   **Purpose:** Emulates lower precisions within a higher-precision format (e.g., simulating a 23-bit mantissa inside a 64-bit double).
+        *   **Answers:** "If I reduce precision in this function to X bits, does the final result stay within my accuracy tolerance?"
+    *   **MCA (Monte Carlo Arithmetic):**
+        *   **Purpose:** Estimates error propagation by introducing small, random perturbations (noise) into every FP operation, simulating the effects of rounding errors.
+        *   **Answers:** "Is this algorithm numerically *stable*? Or is it highly sensitive to tiny rounding errors that would be amplified in lower precision?" A code section that behaves erratically under MCA is a poor candidate for precision reduction.
+
+___
+
+## Part 3: The Proposed Methodology
+
+The workflow is a systematic pruning process to identify suitable code sections for MXP.
+
+**(Figure 1 Flowchart)**: `Original App` => `Profile/Roofline` => `Check Accuracy (Verificarlo)` => `Candidate Sections` => `Expert Validation` => `Port to MXP` => `Final App`
+
+1.  **Step 1: Profile & Project Performance**
+    *   Use profiling tools (e.g., `Callgrind`) to find the computational "hotspots" where the application spends most of its time.
+    *   Use a **Roofline model** to visualize performance. This helps predict if a kernel is memory-bound (likely to benefit greatly from `fp32`'s reduced data movement) or compute-bound.
+
+2.  **Step 2: Automated Accuracy & Stability Analysis**
+    *   Take the hotspots and analyze them with **Verificarlo**.
+    *   **Pruning w/ VPREC:** Run the code while emulating `fp32` in the target section. If the final error exceeds the user-defined threshold, the section is discarded.
+    *   **Pruning w/ MCA:** Run the remaining candidates with the MCA backend. If the results are highly unstable or show massive error fluctuations, the algorithm is too sensitive and the section is discarded.
+
+3.  **Step 3: Expert Implementation & Validation**
+    *   The small set of remaining candidate sections are manually ported to `fp32`.
+    *   This requires expert knowledge to handle type conversions and library calls correctly.
+    *   The final MXP version is validated for accuracy, performance, and energy consumption against the original `fp64` version.
+
+___
+
+## Part 4: Case Studies & Key Findings
+
+### 4.1. Case Study: Nekbone (Mini-Application)
+
+*   **Initial Analysis:** Profiling confirmed the **Conjugate Gradient (CG) loop** is the main hotspot. The Roofline model showed its key kernels were memory-bound, making them excellent candidates for `fp32`.
+*   **Verificarlo Insights:**
+    *   MCA analysis of the entire program showed significant fluctuations.
+    *   Deeper analysis revealed the issue was not the CG loop itself, but the **initialization routines**, which were highly sensitive to precision.
+    *   The CG loop *alone* was numerically stable under MCA. => **Decision: Focus only on the CG loop for MXP.**
+*   **The Preconditioner Challenge & The Critical Finding:**
+    *   When the preconditioned CG (PCG) loop was converted to `fp32`, the solver would **stagnate**, failing to converge.
+    *   Initial hypothesis: `sqrt` operations in the preconditioner were the problem. Switching just `sqrt` to `fp64` helped in serial runs but failed in parallel.
+    *   **The Real Culprit:** The stagnation in parallel runs was caused by error accumulation in **global communication operations**—specifically, the **Gather-Scatter (GSO)** operations used for MPI reductions (`MPI_Allreduce`).
+> **Key Principle 1:** Local arithmetic can often tolerate lower precision, but global operations that sum data across many processors (like dot products) are extremely sensitive to error accumulation and often require high precision.
+
+*   **Winning Strategy for Nekbone:**
+    *   Initialization in `fp64`.
+    *   PCG loop computations (vector adds, matrix-vector products) in `fp32`.
+    *   **Critical operations retained in `fp64`:**
+        1.  `sqrt` calls within the preconditioner.
+        2.  All global dot products.
+        3.  All Gather-Scatter communication operations.
+
+### 4.2. Case Study: Neko (Modern CFD Application)
+
+*   **Applying Lessons Learned:** The strategy from Nekbone was applied directly. The goal was to run the solver in `fp32` but keep global communications in `fp64`.
+*   **Implementation Challenges:** Neko's modern, modular code was designed for a single precision set at compile time. The authors had to refactor parts of the code to handle multiple precisions simultaneously, passing `fp32` and `fp64` data types as needed.
+*   **Advanced Techniques for Reductions:** To avoid costly type-casting for every dot product:
+    *   **`dot2`:** A compensated summation algorithm was used for *local* dot products. It uses `fp32` arithmetic but produces a result as accurate as an `fp64` dot product, effectively hiding the precision issue.
+    *   **Error-Free Transformations (`twosum`):** Used to implement custom `MPI_Allreduce` operations that maintain high precision during the global sum.
+*   **Result:** This strategy successfully resolved the convergence stagnation that had been observed in previous attempts to convert Neko's solver to `fp32`.
+
+---
+
+## Part 5: Performance Evaluation & Quantitative Results
+
+*   **HPC Systems:** Kebnekaise (Sweden), LUMI-C (Finland), MareNostrum 5 (Spain).
+*   **Accuracy:** The MXP versions successfully converged to the same tight tolerances (`1e-10`) as the full `fp64` versions.
+*   **Time-to-Solution Gain (Speedup):**
+    *   **Nekbone:** Up to **1.62x** speedup on MareNostrum 5 (80 MPI ranks). Gain generally increased with problem size and parallelism.
+    *   **Neko:** Up to **1.41x** speedup on MareNostrum 5. Gains were positive but more modest, attributed to Neko's more optimized codebase and the overhead of type casting in its modular design.
+*   **Energy-to-Solution Gain (Efficiency):**
+    *   **Nekbone:** Up to a massive **2.43x** reduction in energy consumed on MareNostrum 5.
+    *   **Neko:** Up to **1.32x** energy savings on MareNostrum 5.
+> **Key Principle 2:** The reduction in energy consumption can be even greater than the reduction in time. Energy-to-solution is a critical and distinct metric for evaluating MXP benefits.
+
+---
+
+## Part 6: Conclusion & Future Outlook
+
+### 6.1. Synthesis of Findings
+The paper successfully demonstrates that a targeted, tool-assisted approach to mixed-precision is highly effective. A "brute force" conversion of entire applications or even entire solvers to `fp32` is likely to fail due to numerical instability.
+
+> **The Overarching Principle:** In many iterative methods, **local computations are robust** and can be performed in lower precision, while **global communication and reduction operations are sensitive** to error accumulation and must be maintained in higher precision to ensure stable convergence.
+
+### 6.2. Broader Impact
+This work provides a practical and validated roadmap for the HPC community to modernize legacy codes and design new ones for performance and energy efficiency. The methodology is applicable beyond CFD to any code using Krylov solvers (e.g., CG, GMRES).
+
+### 6.3. Future Work
+*   Exploring **adaptive precision** techniques, where the solver could dynamically change precision based on its convergence behavior.
+*   Applying the methodology to larger, more complex applications.

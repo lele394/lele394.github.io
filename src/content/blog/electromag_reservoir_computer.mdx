@@ -1,0 +1,188 @@
+---
+title: "Creating a reservoir computer with an N-Body simulation and electromagnetism."
+description: "Exploration of how one can create a reservoir computer using an N-Body simulation and electromagnetism."
+pubDate: 2026-05-17
+tags: ["math", "python", "electromagnetism", "n-body", "simulation", "reservoir computing", "machine learning"]
+---
+
+import { Image } from 'astro:assets';
+import img1 from '../../assets/blog/electromag_reservoir_computer/training_history.png';
+import img2 from '../../assets/blog/electromag_reservoir_computer/averaged_accuracy_delta.png';
+import img3 from '../../assets/blog/electromag_reservoir_computer/averaged_diff_cm.png';
+import img4 from '../../assets/blog/electromag_reservoir_computer/cofcomp00.png';
+import img5 from '../../assets/blog/electromag_reservoir_computer/confcomp15.png';
+
+> The code is available on [GitHub](https://github.com/lele394/N-Body-electromagnetic-reservoir-computer).
+
+In this post, we explore the design, challenges, and validation of an **N-Body Electromagnetic Reservoir Computer (NB-ERC)**. By simulating a 2D interacting charged-particle system—analogous to a dusty plasma or an ion trap—we demonstrate how Coulomb forces can be harnessed to extract topological features from the MNIST dataset. Quickly said, I wanted to mess around with physics-based machine learning, and this is the result.
+
+Here is a deep dive into the architecture, the hurdles we overcame to tame physics into a computational engine, and an empirical proof that electromagnetic interactions provide a measurable algorithmic advantage.
+
+> **Note:** I realized this project in the span of a weekend. While I have authored the code and reviewed results, it is necessary to state that this has been heavily "vibe-coded" and that the analysis is not as rigorous as an article or report in an academic setting would be. Please proceed at your own risk, and I do encourage you to read the code and run the experiments yourself to verify the claims.
+
+---
+
+## 1. The Physical Core: Designing the Dynamical System
+
+The heart of the NB-ERC is a collection of $N$ particles with random masses and charges, confined to a 2D plane. 
+
+### The Mathematics of the Reservoir
+At any given time, the acceleration of a particle $i$ is governed by three primary forces:
+1. **Coulomb Repulsion/Attraction:** The nonlinear "engine" of the computation.
+2. **Harmonic Confinement:** A quadratic potential well keeping the particles from escaping to infinity.
+3. **Damping (Friction):** A dissipative term that ensures fading memory and limits chaotic divergence.
+
+The total force on particle $i$ is:
+$ \vec{F}_i = \sum_{j \neq i} k_c \frac{q_i q_j}{(|\vec{r}_{ij}|^2 + \epsilon^2)^{3/2}} \vec{r}_{ij} - k_w \vec{x}_i - \gamma \vec{v}_i $
+
+This is a classical N-Body electromagnetic simulation where we confine the particles in a potential well. 
+
+### Real-World Feasibility
+This mathematical model is not just a software abstraction; it directly mirrors real-world experimental physics. Such a system could be physically instantiated using charged ions confined in a magnetic trap and manually placed with optical tweezers.
+
+#### The Singularity Problem
+* **The Issue:** The raw $1/r^2$ Coulomb law contains a singularity. If two particles get too close, the force approaches infinity, resulting in numerical explosions (`NaN` values) that instantly destroy the simulation.
+* **The Fix:** We introduced **Force Softening ($\epsilon$)**, as seen in the denominator of the force equation. This ensures that even at zero distance, the force is capped, allowing stable "collisions" and high-density states.
+
+---
+
+## 2. The Integration Engine: Why Euler Fails
+
+To simulate the system, we must numerically integrate the equations of motion. 
+
+* **The Issue:** Initial implementations used standard Euler integration. Because Euler is non-symplectic, it injects artificial energy into the system at every time step. Within 50 steps, our reservoir would "boil over" into chaotic noise, regardless of the input.
+* **The Fix:** We transitioned to the **Velocity Verlet** integrator. 
+
+$$ \vec{v}_{t+1/2} = \vec{v}_t + \frac{1}{2} \vec{a}_t \Delta t \\$$
+$$ \vec{x}_{t+1} = \vec{x}_t + \vec{v}_{t+1/2} \Delta t \\$$
+$$ \vec{v}_{t+1} = \vec{v}_{t+1/2} + \frac{1}{2} \vec{a}_{t+1} \Delta t $$
+
+Velocity Verlet provides excellent phase-space conservation and time-reversibility. It allowed us to push the interaction strength ($k_c$) higher without the system tearing itself apart.
+
+---
+
+## 3. Input Encoding: From Continuous Driving to Random Matrix Mapping
+
+How do we feed a high-dimensional 2D image (784 pixels) into a low-dimensional cloud of interacting particles (64 particles)? 
+
+* **The Issue:** Originally, we treated the input pixels as a continuous external driving force—essentially applying a time-invariant electric field $\vec{F}_{ext}$ that "pushed" the particles for the entire duration of the simulation. This failed spectacularly. The external driving force was so dominant that it drowned out the internal Coulomb interactions. The natural physics became useless noise, and a basic linear model easily outperformed the reservoir.
+* **The Fix: Transient Ballistic Encoding.** We removed the continuous external driving force entirely. Instead, we use the image strictly to dictate the **initial positions** of the particles, treating the input as a "Big Bang."
+
+Mathematically, let our flattened MNIST image be a vector $\mathbf{u} \in \mathbb{R}^{784}$. We define a fixed, random projection matrix $\mathbf{W}_{in} \in \mathbb{R}^{784 \times 2N}$, where $N$ is the number of particles.
+
+The entire initial state of the reservoir's positions $\mathbf{P}(0)$ is computed as a single linear projection:
+
+$$ \mathbf{P}(0) = \mathbf{u} \mathbf{W}_{in} $$
+
+To understand what this means for a **single pixel**, we can break this matrix multiplication down to the level of an individual particle $i$. The starting 2D coordinate $\vec{r}_i(0) = [x_i(0), y_i(0)]$ of particle $i$ is the linear combination of all pixel intensities:
+
+$$ \vec{r}_i(0) = \sum_{p=1}^{784} u_p \vec{w}_{p, i} $$
+
+Here, $u_p$ is the brightness of pixel $p$, and $\vec{w}_{p, i} \in \mathbb{R}^2$ is the specific 2D weight vector linking pixel $p$ to particle $i$. 
+
+If a single pixel $p$ is bright, it acts as a translation vector, physically shifting its assigned particles in the 2D arena proportional to its intensity $u_p$. When you combine the spatial translations from all the bright pixels comprising a digit, the 64 particles are dragged into a highly specific, tangled arrangement. 
+
+This unique "constellation" acts as a compressed, physical shadow of the image. Once this initial constellation is set at $t=0$, we assign zero initial velocity ($\vec{v}_i(0) = 0$), turn off all external inputs, and "let go." 
+
+Particles that were forced unnaturally close together by the image's specific geometry will violently repel each other, while those spread further apart will interact more gently. The computation happens entirely through this unforced, transient relaxation of the system, effectively turning static pixel topology into dynamic kinetic and potential energy.
+
+---
+
+## 4. Breaking Symmetry: Quadrant Spatial Clustering
+
+Because we compress 784 pixels into the initial coordinates of just 64 particles, we face a massive 12:1 information bottleneck.
+
+* **The Issue:** Using a purely random input projection matrix ($W_{in}$) resulted in "Global Chaos." Neighboring pixels in the image were mapped to unrelated particles across the reservoir. The $1/r^2$ force—which specializes in detecting *local* density was rendering the image into a meaningless topological soup.
+* **The Fix:** We implemented **Quadrant-Locked Mapping**. The 28x28 image is sliced into four spatial quadrants. We restrict $W_{in}$ so that pixels in the top-left of the image only dictate the starting positions of 16 specific particles.
+    * **Motivation:** By preserving spatial locality, the Coulomb expansion acts as a local feature extractor. If a digit has a tight loop in the top right, the particles in that specific quadrant will experience a high-pressure "explosion," creating a unique signature.
+
+---
+
+## 5. Feature Extraction: Science-Backed Astrology
+
+To perform classification, a linear readout layer must observe the reservoir. But observing *when* and *what* is critical.
+
+* **The Temporal Issue:** If we only look at the final state (e.g., $t=50$), the fading memory of the system means the particles have forgotten the sharp geometric details of the initial image.
+* **The Temporal Fix:** We extract the state at multiple **checkpoints** (e.g., $t \in [2, 5, 10, 20, 50]$). Early steps capture sharp linear geometry; late steps capture complex nonlinear interactions.
+
+* **The Feature Issue:** A linear readout observing just $(X, Y)$ coordinates will mostly just apply linear transformations. How do we force it to "see" the nonlinear physics?
+* **The Feature Fix:** We compute the **Inter-particle Potential Energy** as a direct feature:
+$$ E_i = \sum_{j \neq i} \frac{k_c q_i q_j}{\sqrt{|\vec{r}_{ij}|^2 + \epsilon^2}} $$
+This energy term *literally does not exist* in a linear system. It acts as a highly nonlinear measure of local density.
+
+---
+
+## 6. Training the Readout Layer (and why we use ADAM)
+
+The final step is mapping the concatenated physical features (Positions, Velocities, and Potential Energies across all checkpoints) to the 10 digit classes. We use a linear layer optimized via Categorical Cross-Entropy.
+
+* **The Issue:** Standard Stochastic Gradient Descent (SGD) stalled. A dynamic learning rate was required.
+* **The Fix:** We utilized the **ADAM optimizer**. The feature vector contains coordinates ($[-2, 2]$) alongside potential energies ($[0.01, 10]$). This scale disparity creates issues for SGD. ADAM's adaptive per-parameter learning rates easily absorb these physical scales, allowing convergence.
+
+---
+
+## 7. Results: Proving the Physical Advantage
+
+One of the concern when building this project is the **"Ghost Reservoir" Baseline (here $k_c = 0$)**. Which means, does the physics help or introduce noise?
+If we turn off the Coulomb interaction ($k_c = 0$), the particles do not interact. The system devolves into a simple, static random linear projection. If our physics ($k_c > 0$) is truly computing, it must consistently beat the $k_c = 0$ baseline.
+
+### Initial Tuning: The "Liquid" Regime
+Early tests with high interaction strengths (e.g., $k_c = 2.5$) caused "shattering." Simple digits like '1' (a dense line of pixels) would explode so violently that all geometric information was lost, lowering accuracy. By tuning the interaction down to $1.5$ alongside moderate damping, we found a regime where particles bend and push each other without erasing the global structure. This is a physical and numerical stability problem.
+
+
+
+<figure className="image-card image-card--wide">
+  <Image src={img1} alt="Initial Training Loss and Accuracy" />
+  <figcaption>Figure 1: Single run training history. The reservoir quickly stabilizes, allowing the linear readout to converge efficiently.</figcaption>
+</figure>
+
+### A Proof of Physics Helping (Averaged over 10 Runs)
+To eliminate random-seed luck, we ran 10 full trials of the MNIST subset for both the Baseline ($k_c = 0$) and the Physics Reservoir ($k_c = 1.5$).
+
+
+
+<figure className="image-card image-card--wide">
+  <Image src={img2} alt="Averaged Accuracy Comparison" />
+  <figcaption>Figure 2: (Left) Averaged Test Accuracy with 1-standard-deviation shaded confidence intervals. (Right) The "Physics Bonus", ie the mean accuracy difference between the physical system and the linear baseline.</figcaption>
+</figure>
+
+
+
+**Key Observations:**
+1. **The "Permanent Green" Delta:** As seen in the right-hand plot, the accuracy gain remains strictly positive for all 300 epochs. The physics is not just adding noise; it is providing a mathematically consistent computational surplus.
+2. **Physical Regularization:** Notice the shaded regions in the left plot. The standard deviation for the physics reservoir ($\pm 0.39\%$) is nearly half that of the linear baseline ($\pm 0.67\%$). The Coulomb interaction acts as a **physical regularizer**, making the network more robust against poor random initializations.
+3. **Net Stable Gain:** The physics achieved a definitive **+0.63% to +1.5% accuracy boost** (depending on the exact tuning). In the heavily saturated $88-90\%$ accuracy bracket for a compressed 64-node network on MNIST, this does sounds like a significant improvement.
+
+### Topological Expertise: The Differential Confusion Matrix
+Where exactly does the physics excel? Subtracting the baseline's confusion matrix from the physics reservoir's matrix reveals the system's "personality."
+
+
+
+<figure className="image-card image-card--wide">
+  <Image src={img3} alt="Differential Confusion Matrix" />
+  <figcaption>Figure 3: Mean Differential Confusion Matrix. Blue values indicate digits where the physics reservoir outperformed the linear baseline.</figcaption>
+</figure>
+
+
+Digits **3, 5, and 8** saw some accuracy improvements (e.g., +5.7 net correct classifications for '5'). It is however necessary to state the context of the magnitude of the improvement.
+
+<div className="image-grid image-grid--two">
+  <figure className="image-card">
+    <Image src={img4} alt="Confusion Comparison at k=0" />
+    <figcaption>Confusion Matrices for the Linear Baseline (k=0).</figcaption>
+  </figure>
+  <figure className="image-card">
+    <Image src={img5} alt="Confusion Comparison at k=1.5" />
+    <figcaption>Confusion Matrices for the Physics Reservoir (k=1.5).</figcaption>
+  </figure>
+</div>
+
+While the improvement isn't dramatic, it is consistent with the idea that the physics is helping to disambiguate digits and leads to better classification of certain classes. The physics reservoir is not magic, but it is providing a measurable boost in the right direction.
+
+---
+
+## Conclusion
+
+The **NB-ERC** demonstrates that nonlinear interactions in classical N-body systems can be successfully corralled to perform complex feature engineering. By carefully balancing ballistic encoding, spatial clustering, and thermodynamic damping, we transitioned a chaotic simulation into a stable computational kernel. 
+
+I'm quite happy with the results, and I hope this inspires others to explore the rich intersection of physics and machine learning. The code is available on [GitHub](https://github.com/lele394/N-Body-electromagnetic-reservoir-computer).
