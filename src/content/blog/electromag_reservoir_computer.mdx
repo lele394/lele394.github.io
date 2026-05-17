@@ -33,7 +33,10 @@ At any given time, the acceleration of a particle $i$ is governed by three prima
 3. **Damping (Friction):** A dissipative term that ensures fading memory and limits chaotic divergence.
 
 The total force on particle $i$ is:
-$ \vec{F}_i = \sum_{j \neq i} k_c \frac{q_i q_j}{(|\vec{r}_{ij}|^2 + \epsilon^2)^{3/2}} \vec{r}_{ij} - k_w \vec{x}_i - \gamma \vec{v}_i $
+
+<div className="center-equation">
+  $ \vec{F}_i = \sum_{j \neq i} k_c \frac{q_i q_j}{(|\vec{r}_{ij}|^2 + \epsilon^2)^{3/2}} \vec{r}_{ij} - k_w \vec{x}_i - \gamma \vec{v}_i $
+</div>
 
 This is a classical N-Body electromagnetic simulation where we confine the particles in a potential well. 
 
@@ -53,9 +56,11 @@ To simulate the system, we must numerically integrate the equations of motion.
 * **The Issue:** Initial implementations used standard Euler integration. Because Euler is non-symplectic, it injects artificial energy into the system at every time step. Within 50 steps, our reservoir would "boil over" into chaotic noise, regardless of the input.
 * **The Fix:** We transitioned to the **Velocity Verlet** integrator. 
 
-$$ \vec{v}_{t+1/2} = \vec{v}_t + \frac{1}{2} \vec{a}_t \Delta t \\$$
-$$ \vec{x}_{t+1} = \vec{x}_t + \vec{v}_{t+1/2} \Delta t \\$$
-$$ \vec{v}_{t+1} = \vec{v}_{t+1/2} + \frac{1}{2} \vec{a}_{t+1} \Delta t $$
+<div className="center-equation">
+  $$ \vec{v}_{t+1/2} = \vec{v}_t + \frac{1}{2} \vec{a}_t \Delta t \\$$
+  $$ \vec{x}_{t+1} = \vec{x}_t + \vec{v}_{t+1/2} \Delta t \\$$
+  $$ \vec{v}_{t+1} = \vec{v}_{t+1/2} + \frac{1}{2} \vec{a}_{t+1} \Delta t $$
+</div>
 
 Velocity Verlet provides excellent phase-space conservation and time-reversibility. It allowed us to push the interaction strength ($k_c$) higher without the system tearing itself apart.
 
@@ -72,11 +77,15 @@ Mathematically, let our flattened MNIST image be a vector $\mathbf{u} \in \mathb
 
 The entire initial state of the reservoir's positions $\mathbf{P}(0)$ is computed as a single linear projection:
 
-$$ \mathbf{P}(0) = \mathbf{u} \mathbf{W}_{in} $$
+<div className="center-equation">
+  $$ \mathbf{P}(0) = \mathbf{u} \mathbf{W}_{in} $$
+</div>
 
 To understand what this means for a **single pixel**, we can break this matrix multiplication down to the level of an individual particle $i$. The starting 2D coordinate $\vec{r}_i(0) = [x_i(0), y_i(0)]$ of particle $i$ is the linear combination of all pixel intensities:
 
-$$ \vec{r}_i(0) = \sum_{p=1}^{784} u_p \vec{w}_{p, i} $$
+<div className="center-equation">
+  $$ \vec{r}_i(0) = \sum_{p=1}^{784} u_p \vec{w}_{p, i} $$
+</div>
 
 Here, $u_p$ is the brightness of pixel $p$, and $\vec{w}_{p, i} \in \mathbb{R}^2$ is the specific 2D weight vector linking pixel $p$ to particle $i$. 
 

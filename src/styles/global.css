@@ -114,8 +114,21 @@ th, td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); text-a
 .sr-only { position: absolute !important; height: 1px; width: 1px; overflow: hidden; clip: rect(1px, 1px, 1px, 1px); white-space: nowrap; }
 
 /* KaTeX */
-.katex, .katex-display { color: var(--text); }
-.katex-display { overflow-x: auto; padding: 0.25rem 0; }
+.katex { color: var(--text); }
+.katex-display { 
+	overflow-x: auto; 
+	padding: 1rem 0;
+	display: block;
+	text-align: center;
+}
+
+/* Utility class for centered equations */
+.center-equation {
+	text-align: center;
+	display: flex;
+	justify-content: center;
+	margin: 1rem 0;
+}
 
 /* Responsive adjustments */
 @media (max-width: 720px) {

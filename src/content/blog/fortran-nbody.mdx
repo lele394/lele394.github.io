@@ -37,7 +37,9 @@ The project report and code can be found in <a href="https://github.com/lele394/
 
 At the heart of any N-Body simulation lies Newton's law of universal gravitation. For each body $i$ in the system, we calculate the acceleration caused by all other bodies:
 
-$$\mathbf{a}_i = G \sum_{j \neq i} \frac{m_j (\mathbf{r}_j - \mathbf{r}_i)}{\|\mathbf{r}_j - \mathbf{r}_i\|^3}$$
+<div className="center-equation">
+  $$\mathbf{a}_i = G \sum_{j \neq i} \frac{m_j (\mathbf{r}_j - \mathbf{r}_i)}{\|\mathbf{r}_j - \mathbf{r}_i\|^3}$$
+</div>
 
 where:
 - $\mathbf{a}_i$ is the acceleration of body $i$
