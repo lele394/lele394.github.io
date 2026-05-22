@@ -1,0 +1,265 @@
+---
+title: "Parameter Inference with MCMC from GBM to Bitcoin"
+tags: ["MCMC", "Python", "Statistics", "Stochastic Processes", "Bitcoin", "Data Science", "Metropolis-Hastings"]
+pubDate: 2026-05-22
+description: "An in-depth exploration of using Markov Chain Monte Carlo methods to reconstruct hidden parameters in stochastic systems, from theoretical Brownian motion to the volatile reality of cryptocurrency markets."
+---
+
+import { Image } from 'astro:assets';
+import img1 from '../../assets/blog/mcmc_applied_to_sde/gbm_trajectories.png'
+import img2 from '../../assets/blog/mcmc_applied_to_sde/mu_posterior.png'
+import img3 from '../../assets/blog/mcmc_applied_to_sde/likelihood_trace.png'
+import img4 from '../../assets/blog/mcmc_applied_to_sde/parameter_space.png'
+import img5 from '../../assets/blog/mcmc_applied_to_sde/sweep_dt.png'
+import img6 from '../../assets/blog/mcmc_applied_to_sde/sweep_t.png'
+import img7 from '../../assets/blog/mcmc_applied_to_sde/btc_vs_model.png'
+import img8 from '../../assets/blog/mcmc_applied_to_sde/btc_envelope_400.png'
+import img9 from '../../assets/blog/mcmc_applied_to_sde/btc_envelope_800.png'
+import img10 from '../../assets/blog/mcmc_applied_to_sde/sigma_symmetry.png'
+
+> Interested in the code? <a href="/blog/mcmc_applied_to_sde/notebook.ipynb" download>download the notebook</a>.
+
+In computational science, we are often presented with a "black box" problem. We observe a trajectory such as a stock price, a particle's path, or a population's growth, and we are tasked with reconstructing the hidden mechanism that produced it. How do we find the "true" parameters of a system when we only have its noisy output? 
+
+This is where **Markov Chain Monte Carlo (MCMC)** methods comes into play. By simulating a random walk through a multi-dimensional parameter space and scoring each step against observed data, we can build a probabilistic map of the system's core constants. This post explores the mechanics of MCMC, the fundamental trade-offs in data sampling, and what happens when these stationary models collide with the chaotic reality of financial time series such as Bitcoin.
+
+## Geometric Brownian Motion
+
+To build a robust way to infer parameters, we start with a controlled environment. We use **Geometric Brownian Motion (GBM)**, a Stochastic Differential Equation (SDE). It describes a system where the change in value is proportional to the current value, modified by a steady trend and random noise.
+
+The dynamics are governed by:
+<div className="center-equation">
+$$ dX_t = \mu X_t dt + \sigma X_t dW_t $$
+</div>
+
+Where:
+- $\mu$ represents the **drift** (the long-term average growth).
+- $\sigma$ represents the **volatility** (the intensity of the random fluctuations).
+- $W_t$ is a standard random walk.
+
+To bridge the gap between continuous theory and computer simulation, we must discretize the SDE. 
+{/* This transition requires a special tool from stochastic calculus, **Itô's Lemma**.
+
+#### Ito's Lemma
+
+When we apply Itô's Lemma to the function $f(X_t) = \ln(X_t)$, it transforms our multiplicative process into a linear addition. This derivation introduces a term which represents the mathematical "drag" that volatility exerts on the average growth of a system. The resulting mapping from time $t$ to $t + \Delta t$ is: */}
+
+<div className="center-equation">
+$$ X_{t+\Delta t} = X_t \exp\left( (\mu - \frac{1}{2}\sigma^2)\Delta t + \sigma \sqrt{\Delta t} Z \right) $$
+</div>
+
+where $Z \sim \mathcal{N}(0, 1)$ is a standard normal random variable. This solution ensures our simulated values stay strictly positive and allows us to implement the model in code:
+
+```python
+def simulate_gbm(x0=1, mu=1.0, sigma=1.0, T=1.0, dt=0.01):
+    N = int(T/dt) # Total number of discrete steps
+    t = np.linspace(0, T, N) 
+    x = np.zeros(N)
+    x[0] = x0 # Initial value
+    
+    # Generate all random shocks at once for efficiency
+    Z = np.random.standard_normal(N - 1)
+
+    # Iterative simulation using the exact solution
+    for i in range(N - 1):
+        x[i+1] = x[i] * np.exp((mu - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * Z[i])
+    return t, x
+```
+
+<figure className="image-card image-card--wide">
+  <Image src={img1} alt="GBM Trajectories" />
+  <figcaption>Figure 1: 500 simulated GBM trajectories. By observing the trajectories in a log-scale, the exponential growth reveals a linear drift, though the high volatility often obscures the signal.</figcaption>
+</figure>
+
+## Likelihood and the Metropolis Walk
+
+To recover $\mu$ and $\sigma$ from a trajectory, we need a way to "score" how well a proposed set of parameters explains the data. This score is the **Log-Likelihood**. Since GBM increments follow a normal distribution in the log-domain, we can calculate the probability density of our observed jumps given a specific $\mu$ and $\sigma$.
+
+To bridge the gap between the SDE and our code, we need to derive the scoring function. Since the log-returns of a GBM follow a Normal distribution, we start with the standard Gaussian PDF and transform it into a computational log-sum.
+
+To score our parameters, we look at the log-increments of our data, $\Delta y_i = \ln(X_{i+1}) - \ln(X_i)$. 
+{/* According to Ito's Lemma, these increments are independent and normally distributed:
+
+<div className="center-equation">
+$$\Delta y_i \sim \mathcal{N}\left( (\mu - \frac{1}{2}\sigma^2)\Delta t, \sigma^2 \Delta t \right)$$
+</div> */}
+
+If we define the mean increment as $m$ and the variance as $v$, the probability density for a single observation is a normal distribution:
+
+<div className="center-equation">
+$$f(\Delta y_i | m, v) = \frac{1}{\sqrt{2\pi v}} \exp\left( -\frac{(\Delta y_i - m)^2}{2v} \right)$$
+</div>
+
+For a full trajectory of $n$ points, the total likelihood is the product of these individual probabilities. By taking the natural logarithm, we turn this product into a sum :
+
+<div className="center-equation">
+$$\ln L = \sum_{i=1}^{n} \ln\left( f(\Delta y_i) \right) = \sum_{i=1}^{n} \left[ -\frac{1}{2}\ln(2\pi v) - \frac{(\Delta y_i - m)^2}{2v} \right]$$
+</div>
+
+Factoring out the constants gives us a final formula we can implement directly in code:
+<div className="center-equation">
+$$\ln L = -\frac{n}{2}\ln(2\pi v) - \frac{1}{2v} \sum_{i=1}^{n} (\Delta y_i - m)^2$$
+</div>
+
+
+```python
+def gbm_log_likelihood(data, dt, mu, sigma):
+    # We look at the differences in the log-transformed data
+    log_increments = np.diff(np.log(data))
+
+    # GBM follows a normal distribution with these parameters
+    mean_inc = (mu - 0.5 * sigma**2) * dt
+    var_inc = (sigma**2) * dt
+    
+    n = len(log_increments)
+    sum_sq_diff = np.sum((log_increments - mean_inc)**2)
+    
+    # Deriving the log-likelihood from the Normal PDF
+    log_lik = -0.5 * (n * np.log(2 * np.pi * var_inc) + (sum_sq_diff / var_inc))
+    return log_lik
+```
+
+Our MCMC engine uses the **Metropolis-Hastings** algorithm. We start at a random point in the $(\mu, \sigma)$ space and propose a move. If the new "score" is better, we move there. If it is worse, we only move there with a specific probability. Over thousands of iterations, the path of the algorithm outlines the **Posterior Distribution**, ie. the most likely values for our parameters.
+
+We do need to propose new parameters in a way that allows us to explore the space effectively. Here we chose to use a classic random walk :
+
+```python
+def random_walk(mu, sigma, distrib_sigma=0.1):
+
+    # new = current + offset + noise
+    new_mu = np.random.normal(loc=mu, scale=distrib_sigma)
+    new_sigma = np.random.normal(loc=sigma, scale=distrib_sigma)
+        
+    return new_mu, new_sigma
+```
+
+And finally, moves are accepted or rejected based on the change in log-likelihood:
+
+```python
+def accept_move(L_new, L_old):
+    log_alpha = L_new - L_old    
+    return np.log(np.random.uniform(0, 1)) < log_alpha
+```
+
+
+
+
+
+
+
+With our scoring function and random walk defined, we can now assemble the complete MCMC engine. The algorithm is an iterative explorer: it starts at an arbitrary point in the parameter space and begins a random walk. At each step, it proposes a small deviation from its current position, evaluates the likelihood of the new parameters, and uses the Metropolis-Hastings criterion to decide whether to "move" or "stay." 
+
+As the number of iterations increases, this chain of decisions tends toward the regions of highest probability. This process generates a history of every accepted state which we can then analyze to find the most likely values for our hidden process.
+
+```python
+def mcmc(data, dt, n_iterations, start_mu, start_sigma, step_size):
+    # Preallocate memory for the chains
+    samples_mu = np.zeros(n_iterations)
+    samples_sigma = np.zeros(n_iterations)
+    samples_log_likelihood = np.zeros(n_iterations)
+    
+    # Initialize at a starting point
+    curr_mu = start_mu
+    curr_sigma = start_sigma
+    L_old = gbm_log_likelihood(data, dt, curr_mu, curr_sigma)
+    
+    accepted_count = 0
+
+    # The MCMC Loop
+    for i in range(n_iterations):
+        # 1. Propose a new parameter set (Random Walk)
+        prop_mu, prop_sigma = random_walk(curr_mu, curr_sigma, step_size)
+        
+        # 2. Score the proposal using our Log-Likelihood
+        L_new = gbm_log_likelihood(data, dt, prop_mu, prop_sigma)
+        
+        # 3. Apply Metropolis-Hastings acceptance logic
+        if accept_move(L_new, L_old):
+            curr_mu = prop_mu
+            curr_sigma = prop_sigma
+            L_old = L_new
+            accepted_count += 1
+            
+        # 4. Store the state of the chain
+        samples_mu[i] = curr_mu
+        samples_sigma[i] = curr_sigma
+        samples_log_likelihood[i] = L_old
+        
+    print(f"Acceptance Rate: {accepted_count / n_iterations:.2%}")
+    return samples_mu, samples_sigma, samples_log_likelihood
+```
+
+{/* <div className="image-grid image-grid--two">
+  <figure className="image-card">
+    <Image src={img3} alt="Likelihood Trace Plot" />
+    <figcaption>Figure 2: The Log-likelihood trace plot. Notice the "startup" time where the algorithm rapidly climbs toward the peak of the probability mountain.</figcaption>
+  </figure>
+  <figure className="image-card">
+    <Image src={img4} alt="Parameter Space Evolution" />
+    <figcaption>Figure 3: The 2D path of the MCMC algorithm. It settles into a cluster around the true parameters, providing both an estimate and a measure of uncertainty.</figcaption>
+  </figure>
+</div> */}
+
+
+
+The convergence of the MCMC can here be visualized in 2D as we are only estimating two parameters. The algorithm starts at a random point and quickly climbs the likelihood landscape, eventually settling into a cluster around the true parameters. The trace plot of the log-likelihood shows a rapid ascent during the "burn-in" phase, followed by a plateau as the chain explores the high-probability region. We note that the convergence is tends towards a local minima which is dependent on the starting point, and may not be the only parameter set that explains the data well. This is a fundamental limitation of MCMC: it provides a probabilistic map of the parameter space, but it does not guarantee finding the global maximum likelihood solution, especially in more complex landscapes.
+
+<figure className="image-card">
+    <Image src={img4} alt="Parameter Space Evolution" />
+    <figcaption>Figure 3: The 2D path of the MCMC algorithm. It settles into a cluster around the true parameters, providing both an estimate and a measure of uncertainty.</figcaption>
+</figure>
+
+## $T$ vs $dt$, or the impact of time and sampling frequency
+
+One question we have to ask is: *How does the quality of our data affect our confidence?* If we increase our data volume, does our precision double? If yes, how does it evolve?
+
+### 1. The Volatility Precision ($\sigma$)
+$\sigma$ represents the "texture" of the noise. To measure it accurately, you need to see many "jumps." Therefore, decreasing the time step ($dt$) while keeping the total time constant drastically improves our estimate of $\sigma$. 
+
+<figure className="image-card">
+<Image src={img5} alt="Precision vs dt" />
+<figcaption>Figure 4: Sweeping through dt. As the number of samples increases, the error bound on volatility ($\sigma$) shrinks significantly.</figcaption>
+</figure>
+
+### 2. The Drift Precision ($\mu$)
+$\mu$ represents the "drift". Precision on drift is primarily dependent on the **total time window ($T$)**. To see the trend, you simply have to wait longer, more datapoint will not help if they are all clustered in a short time span. As $T$ increases, the confidence interval for $\mu$ shrinks.
+
+<figure className="image-card">
+    <Image src={img6} alt="Precision vs T" />
+    <figcaption>Figure 5: Sweeping through T. Drift ($\mu$) remains noisy and difficult to pin down until the time window becomes sufficiently large.</figcaption>
+</figure>
+
+An interesting mathematical nuance arises when we observe the symmetry of our likelihood function. In the GBM equations, volatility $(\sigma)$ primarily appears as a squared term. The system is non-identifiable regarding the sign of volatility.
+
+### 3. Symmetry on $\sigma$
+
+If we run two independent MCMC chains, one starting at $\sigma_0 = 0.5$ and another at $\sigma_0 = -0.5$—the algorithm demonstrates this symmetry perfectly. Both chains successfully "find" the correct magnitude of volatility ($\approx 0.3$), but they converge to two distinct, mirrored islands in the parameter space. While "negative volatility" doesn't have a physical meaning in standard finance, it is a mathematically valid solution to our equations.
+
+<figure className="image-card image-card--wide">
+  <Image src={img10} alt="MCMC Symmetry and Posterior Density" />
+  <figcaption>Figure 8: MCMC paths from mirrored initial conditions. The green chain converges to a positive σ, while the red chain finds the negative mirror. Note how the "width" of the clusters is much tighter on the y-axis (σ) than the x-axis (μ), reinforcing the precision trade-off between volatility and drift.</figcaption>
+</figure>
+
+## Financial time series and the unpredictability of Bitcoin
+
+Theoretical models are fixed, the parameters are constant over time. Real-world financial data, particularly cryptocurrencies such as Bitcoin, are **non-stationary**. It is a "moving target" because market participants react to the very data we are analyzing. This is known as **market reflexivity**. Characterizing the time serie leads the market to change its behavior, which in turn changes the time series itself.
+
+When we apply our MCMC to Bitcoin hourly data, the limitations of the GBM model become apparent. By using a **Sliding Window MCMC** (ie. We compute $\sigma$ and $\mu$ over a moving window in the data), we can see how $\mu$ and $\sigma$ evolve over time.
+
+<div className="image-grid image-grid--two">
+  <figure className="image-card">
+    <Image src={img8} alt="BTC 400h Window" />
+    <figcaption>Figure 6: 400-hour window. This setup is highly reactive to sudden shifts, showing "Volatility Clustering" where stress bursts are clearly isolated.</figcaption>
+  </figure>
+  <figure className="image-card">
+    <Image src={img9} alt="BTC 800h Window" />
+    <figcaption>Figure 7: 800-hour window. The longer window attempts to smooth the drift, yet it often fails to stay relevant as the market regime changes entirely.</figcaption>
+  </figure>
+</div>
+
+### Lessons from the Market
+Our Bitcoin analysis reveals that the assumption of constant parameters is a dangerous simplification. The assets exhibit clear evidence of clusters: periods of calm followed by violent, high-stress bursts. 
+
+By comparing the 400-hour and 800-hour windows, we observe a critical trade-off: a shorter window reacts to the present but suffers from massive uncertainty. A longer window provides more data points, but those points might come from a "different world" where the market rules were different. 
+
+In the end, while MCMC is a powerful tool for identifying parameters in stationary physical processes, it serves a different purpose in finance: it provides a fleeting, localized snapshot of a system that is fundamentally evolving. As such, the GBM model cannot be used for forecasting. This is the main paradox of financial modeling: the more we understand the past, the less relevant that understanding becomes for predicting the future, due to the very nature of the system we analyze.
