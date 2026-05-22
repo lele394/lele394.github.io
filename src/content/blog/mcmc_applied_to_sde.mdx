@@ -119,7 +119,7 @@ def gbm_log_likelihood(data, dt, mu, sigma):
     return log_lik
 ```
 
-Our MCMC engine uses the **Metropolis-Hastings** algorithm. We start at a random point in the $(\mu, \sigma)$ space and propose a move. If the new "score" is better, we move there. If it is worse, we only move there with a specific probability. Over thousands of iterations, the path of the algorithm outlines the **Posterior Distribution**, ie. the most likely values for our parameters.
+Our MCMC loop uses the **Metropolis-Hastings** algorithm. We start at a random point in the $(\mu, \sigma)$ space and propose a move. If the new "score" is better, we move there. If it is worse, we only move there with a specific probability. Over thousands of iterations, the path of the algorithm outlines the **Posterior Distribution**, ie. the most likely values for our parameters.
 
 We do need to propose new parameters in a way that allows us to explore the space effectively. Here we chose to use a classic random walk :
 
@@ -147,7 +147,7 @@ def accept_move(L_new, L_old):
 
 
 
-With our scoring function and random walk defined, we can now assemble the complete MCMC engine. The algorithm is an iterative explorer: it starts at an arbitrary point in the parameter space and begins a random walk. At each step, it proposes a small deviation from its current position, evaluates the likelihood of the new parameters, and uses the Metropolis-Hastings criterion to decide whether to "move" or "stay." 
+With our scoring function and random walk defined, we can now assemble the complete MCMC loop. The algorithm is an iterative explorer: it starts at an arbitrary point in the parameter space and begins a random walk. At each step, it proposes a small deviation from its current position, evaluates the likelihood of the new parameters, and uses the Metropolis-Hastings criterion to decide whether to "move" or "stay." 
 
 As the number of iterations increases, this chain of decisions tends toward the regions of highest probability. This process generates a history of every accepted state which we can then analyze to find the most likely values for our hidden process.
 
@@ -214,7 +214,7 @@ The convergence of the MCMC can here be visualized in 2D as we are only estimati
 One question we have to ask is: *How does the quality of our data affect our confidence?* If we increase our data volume, does our precision double? If yes, how does it evolve?
 
 ### 1. The Volatility Precision ($\sigma$)
-$\sigma$ represents the "texture" of the noise. To measure it accurately, you need to see many "jumps." Therefore, decreasing the time step ($dt$) while keeping the total time constant drastically improves our estimate of $\sigma$. 
+$\sigma$ represents the spread of the noise. To measure it accurately, you need to see many "jumps." Therefore, decreasing the time step ($dt$) while keeping the total time constant drastically improves our estimate of $\sigma$. 
 
 <figure className="image-card">
 <Image src={img5} alt="Precision vs dt" />
@@ -222,7 +222,7 @@ $\sigma$ represents the "texture" of the noise. To measure it accurately, you ne
 </figure>
 
 ### 2. The Drift Precision ($\mu$)
-$\mu$ represents the "drift". Precision on drift is primarily dependent on the **total time window ($T$)**. To see the trend, you simply have to wait longer, more datapoint will not help if they are all clustered in a short time span. As $T$ increases, the confidence interval for $\mu$ shrinks.
+$\mu$ represents the drift. Precision on drift is primarily dependent on the **total time window ($T$)**. To see the trend, you simply have to wait longer, more datapoint will not help if they are all clustered in a short time span. As $T$ increases, the confidence interval for $\mu$ shrinks.
 
 <figure className="image-card">
     <Image src={img6} alt="Precision vs T" />
@@ -260,6 +260,6 @@ When we apply our MCMC to Bitcoin hourly data, the limitations of the GBM model 
 ### Lessons from the Market
 Our Bitcoin analysis reveals that the assumption of constant parameters is a dangerous simplification. The assets exhibit clear evidence of clusters: periods of calm followed by violent, high-stress bursts. 
 
-By comparing the 400-hour and 800-hour windows, we observe a critical trade-off: a shorter window reacts to the present but suffers from massive uncertainty. A longer window provides more data points, but those points might come from a "different world" where the market rules were different. 
+By comparing the 400-hour and 800-hour windows, we observe a critical trade-off: a shorter window reacts to the present but suffers from massive uncertainty. A longer window provides more data points, but those points might come from a different world  where the market rules were different. 
 
 In the end, while MCMC is a powerful tool for identifying parameters in stationary physical processes, it serves a different purpose in finance: it provides a fleeting, localized snapshot of a system that is fundamentally evolving. As such, the GBM model cannot be used for forecasting. This is the main paradox of financial modeling: the more we understand the past, the less relevant that understanding becomes for predicting the future, due to the very nature of the system we analyze.
