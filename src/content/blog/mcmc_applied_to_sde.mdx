@@ -19,7 +19,7 @@ import img10 from '../../assets/blog/mcmc_applied_to_sde/sigma_symmetry.png'
 
 > Interested in the code? <a href="/blog/mcmc_applied_to_sde/notebook.ipynb" download>download the notebook</a>.
 
-In computational science, we are often presented with a "black box" problem. We observe a trajectory such as a stock price, a particle's path, or a population's growth, and we are tasked with reconstructing the hidden mechanism that produced it. How do we find the "true" parameters of a system when we only have its noisy output? 
+In computational science, we are often presented with a black box problem. We observe a trajectory such as a stock price, a particle's path, or a population's growth, and we are tasked with reconstructing the hidden mechanism that produced it. How do we find the true parameters of a system when we only have its noisy output? 
 
 This is where **Markov Chain Monte Carlo (MCMC)** methods comes into play. By simulating a random walk through a multi-dimensional parameter space and scoring each step against observed data, we can build a probabilistic map of the system's core constants. This post explores the mechanics of MCMC, the fundamental trade-offs in data sampling, and what happens when these stationary models collide with the chaotic reality of financial time series such as Bitcoin.
 
@@ -73,7 +73,7 @@ def simulate_gbm(x0=1, mu=1.0, sigma=1.0, T=1.0, dt=0.01):
 
 ## Likelihood and the Metropolis Walk
 
-To recover $\mu$ and $\sigma$ from a trajectory, we need a way to "score" how well a proposed set of parameters explains the data. This score is the **Log-Likelihood**. Since GBM increments follow a normal distribution in the log-domain, we can calculate the probability density of our observed jumps given a specific $\mu$ and $\sigma$.
+To recover $\mu$ and $\sigma$ from a trajectory, we need a way to score how well a proposed set of parameters explains the data. This score is the **Log-Likelihood**. Since GBM increments follow a normal distribution in the log-domain, we can calculate the probability density of our observed jumps given a specific $\mu$ and $\sigma$.
 
 To bridge the gap between the SDE and our code, we need to derive the scoring function. Since the log-returns of a GBM follow a Normal distribution, we start with the standard Gaussian PDF and transform it into a computational log-sum.
 
@@ -119,7 +119,7 @@ def gbm_log_likelihood(data, dt, mu, sigma):
     return log_lik
 ```
 
-Our MCMC loop uses the **Metropolis-Hastings** algorithm. We start at a random point in the $(\mu, \sigma)$ space and propose a move. If the new "score" is better, we move there. If it is worse, we only move there with a specific probability. Over thousands of iterations, the path of the algorithm outlines the **Posterior Distribution**, ie. the most likely values for our parameters.
+Our MCMC loop uses the **Metropolis-Hastings** algorithm. We start at a random point in the $(\mu, \sigma)$ space and propose a move. If the new score is better, we move there. If it is worse, we only move there with a specific probability. Over thousands of iterations, the path of the algorithm outlines the **Posterior Distribution**, ie. the most likely values for our parameters.
 
 We do need to propose new parameters in a way that allows us to explore the space effectively. Here we chose to use a classic random walk :
 
@@ -147,7 +147,7 @@ def accept_move(L_new, L_old):
 
 
 
-With our scoring function and random walk defined, we can now assemble the complete MCMC loop. The algorithm is an iterative explorer: it starts at an arbitrary point in the parameter space and begins a random walk. At each step, it proposes a small deviation from its current position, evaluates the likelihood of the new parameters, and uses the Metropolis-Hastings criterion to decide whether to "move" or "stay." 
+With our scoring function and random walk defined, we can now assemble the complete MCMC loop. The algorithm is an iterative explorer: it starts at an arbitrary point in the parameter space and begins a random walk. At each step, it proposes a small deviation from its current position, evaluates the likelihood of the new parameters, and uses the Metropolis-Hastings criterion to decide whether to move or stay.
 
 As the number of iterations increases, this chain of decisions tends toward the regions of highest probability. This process generates a history of every accepted state which we can then analyze to find the most likely values for our hidden process.
 
@@ -202,7 +202,7 @@ def mcmc(data, dt, n_iterations, start_mu, start_sigma, step_size):
 
 
 
-The convergence of the MCMC can here be visualized in 2D as we are only estimating two parameters. The algorithm starts at a random point and quickly climbs the likelihood landscape, eventually settling into a cluster around the true parameters. The trace plot of the log-likelihood shows a rapid ascent during the "burn-in" phase, followed by a plateau as the chain explores the high-probability region. We note that the convergence is tends towards a local minima which is dependent on the starting point, and may not be the only parameter set that explains the data well. This is a fundamental limitation of MCMC: it provides a probabilistic map of the parameter space, but it does not guarantee finding the global maximum likelihood solution, especially in more complex landscapes.
+The convergence of the MCMC can here be visualized in 2D as we are only estimating two parameters. The algorithm starts at a random point and quickly climbs the likelihood landscape, eventually settling into a cluster around the true parameters. The trace plot of the log-likelihood shows a rapid ascent during the *burn-in* phase, followed by a plateau as the chain explores the high-probability region. We note that the convergence is tends towards a local minima which is dependent on the starting point, and may not be the only parameter set that explains the data well. This is a fundamental limitation of MCMC: it provides a probabilistic map of the parameter space, but it does not guarantee finding the global maximum likelihood solution, especially in more complex landscapes.
 
 <figure className="image-card">
     <Image src={img4} alt="Parameter Space Evolution" />
@@ -211,10 +211,10 @@ The convergence of the MCMC can here be visualized in 2D as we are only estimati
 
 ## $T$ vs $dt$, or the impact of time and sampling frequency
 
-One question we have to ask is: *How does the quality of our data affect our confidence?* If we increase our data volume, does our precision double? If yes, how does it evolve?
+We need to also characterize the difference between the two parameters we are trying to estimate. $\sigma$ is a measure of noise, while $\mu$ is a measure of signal. Intuitively, we would expect that more data points would help us better understand the noise, but it is necessary to understand how we should sample the signal and the advantages and drawbacks of each methods.
 
 ### 1. The Volatility Precision ($\sigma$)
-$\sigma$ represents the spread of the noise. To measure it accurately, you need to see many "jumps." Therefore, decreasing the time step ($dt$) while keeping the total time constant drastically improves our estimate of $\sigma$. 
+$\sigma$ represents the spread of the noise. To measure it accurately, you need to see many datapoints. Therefore, decreasing the time step ($dt$) while keeping the total time constant drastically improves our estimate of $\sigma$. 
 
 <figure className="image-card">
 <Image src={img5} alt="Precision vs dt" />
@@ -233,23 +233,23 @@ An interesting mathematical nuance arises when we observe the symmetry of our li
 
 ### 3. Symmetry on $\sigma$
 
-If we run two independent MCMC chains, one starting at $\sigma_0 = 0.5$ and another at $\sigma_0 = -0.5$—the algorithm demonstrates this symmetry perfectly. Both chains successfully "find" the correct magnitude of volatility ($\approx 0.3$), but they converge to two distinct, mirrored islands in the parameter space. While "negative volatility" doesn't have a physical meaning in standard finance, it is a mathematically valid solution to our equations.
+If we run two independent MCMC chains, one starting at $\sigma_0 = 0.5$ and another at $\sigma_0 = -0.5$—the algorithm demonstrates this symmetry perfectly. Both chains successfully find the correct magnitude of volatility ($\approx 0.3$), but they converge to two distinct, mirrored islands in the parameter space. While negative volatility doesn't have a physical meaning in standard finance, it is a mathematically valid solution to our equations.
 
 <figure className="image-card image-card--wide">
   <Image src={img10} alt="MCMC Symmetry and Posterior Density" />
-  <figcaption>Figure 8: MCMC paths from mirrored initial conditions. The green chain converges to a positive σ, while the red chain finds the negative mirror. Note how the "width" of the clusters is much tighter on the y-axis (σ) than the x-axis (μ), reinforcing the precision trade-off between volatility and drift.</figcaption>
+  <figcaption>Figure 8: MCMC paths from mirrored initial conditions. The green chain converges to a positive $\sigma$, while the red chain finds the negative mirror. Note how the width of the clusters is much tighter on the y-axis ($\sigma$) than the x-axis ($\mu$), reinforcing the precision trade-off between volatility and drift.</figcaption>
 </figure>
 
 ## Financial time series and the unpredictability of Bitcoin
 
-Theoretical models are fixed, the parameters are constant over time. Real-world financial data, particularly cryptocurrencies such as Bitcoin, are **non-stationary**. It is a "moving target" because market participants react to the very data we are analyzing. This is known as **market reflexivity**. Characterizing the time serie leads the market to change its behavior, which in turn changes the time series itself.
+Theoretical models are fixed, the parameters are constant over time. Real-world financial data, particularly cryptocurrencies such as Bitcoin, are **non-stationary**. It is a moving target because market participants react to the very data we are analyzing. This is known as **market reflexivity**. Characterizing the time serie leads the market to change its behavior, which in turn changes the time series itself.
 
 When we apply our MCMC to Bitcoin hourly data, the limitations of the GBM model become apparent. By using a **Sliding Window MCMC** (ie. We compute $\sigma$ and $\mu$ over a moving window in the data), we can see how $\mu$ and $\sigma$ evolve over time.
 
 <div className="image-grid image-grid--two">
   <figure className="image-card">
     <Image src={img8} alt="BTC 400h Window" />
-    <figcaption>Figure 6: 400-hour window. This setup is highly reactive to sudden shifts, showing "Volatility Clustering" where stress bursts are clearly isolated.</figcaption>
+    <figcaption>Figure 6: 400-hour window. This setup is highly reactive to sudden shifts, showing Volatility Clustering where stress bursts are clearly isolated.</figcaption>
   </figure>
   <figure className="image-card">
     <Image src={img9} alt="BTC 800h Window" />
@@ -259,7 +259,5 @@ When we apply our MCMC to Bitcoin hourly data, the limitations of the GBM model 
 
 ### Lessons from the Market
 Our Bitcoin analysis reveals that the assumption of constant parameters is a dangerous simplification. The assets exhibit clear evidence of clusters: periods of calm followed by violent, high-stress bursts. 
-
-By comparing the 400-hour and 800-hour windows, we observe a critical trade-off: a shorter window reacts to the present but suffers from massive uncertainty. A longer window provides more data points, but those points might come from a different world  where the market rules were different. 
 
 In the end, while MCMC is a powerful tool for identifying parameters in stationary physical processes, it serves a different purpose in finance: it provides a fleeting, localized snapshot of a system that is fundamentally evolving. As such, the GBM model cannot be used for forecasting. This is the main paradox of financial modeling: the more we understand the past, the less relevant that understanding becomes for predicting the future, due to the very nature of the system we analyze.
