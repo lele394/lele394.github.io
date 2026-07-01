@@ -5,6 +5,11 @@ pubDate: 2026-07-1
 description: "An exploration of how Optimal Control Theory connects to Neural ODEs and ResNets."
 ---
 
+import { Image } from 'astro:assets';
+import img1 from '../../assets/blog/optimal_control_link_to_nn/1.jpg'
+import img2 from '../../assets/blog/optimal_control_link_to_nn/2.jpg'
+import img3 from '../../assets/blog/optimal_control_link_to_nn/3.jpg'
+
 > *AI disclosure : AI has been used to assist in the writing of this article. The content has been reviewed, edited, and validated by a human author (me). If something's wrong, I manually fucked it up, not the AI (I mean, it probably helped)*
 
 In contemporary deep learning, we often treat architectures like Residual Networks (ResNets) as empirical breakthroughs, design choices that happen to solve the vanishing gradient problem. However, if we look back to the mid-20th century, we find that these architectures and the methods we use to train them are deeply rooted in **Optimal Control Theory**.
@@ -141,3 +146,24 @@ It is, in my opinion, quite remarkable that the aerospace challenges of the 1950
 Understanding this connection allows us to view deep learning not just as a branch of computer science, but as the modern frontier of classical dynamics and optimal control.
 
 While not being the current mainstream ways of training and using AI, the fact that this is possible opens the door to new architectures and training methods that are more efficient, more interpretable, and potentially more powerful. A main advantage lies in physics itself, where lower power consumption and better generalization can be achieved by using continuous models that respect the underlying dynamics of the data. Systems can be tuned with domain-specific methods, current work use optical delay line in optical networks, and it isn't hard for any expert in any domain to imagine how to use the same principles in their own field. I strongly suggest the reader to explore Neural ODEs and think about how they can be applied to their own problems, as the potential is vast and largely untapped.
+
+
+
+## Original presentation black-board
+
+This post is the blog version of a small presentation I gave around a month ago at Uppsala University. Here is the original blackboard version of the presentation, which I think is a nice summary of the main points.
+
+<div className="image-grid image-grid--three">
+  <figure className="image-card">
+    <Image src={img1} alt="panel 1" />
+    <figcaption>Panel 1</figcaption>
+  </figure>
+  <figure className="image-card">
+    <Image src={img2} alt="panel 2" />
+    <figcaption>Panel 2</figcaption>
+  </figure>
+  <figure className="image-card">
+        <Image src={img3} alt="panel 3" />
+    <figcaption>Panel 3</figcaption>
+  </figure>
+</div>
