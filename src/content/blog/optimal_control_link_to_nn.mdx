@@ -120,7 +120,7 @@ This leads to the concept of **Neural Ordinary Differential Equations (Neural OD
 
 By treating the network as a continuous flow, we can apply Pontryagin's Adjoint Method directly. We can solve the ODE backward in time to calculate gradients, which allows us to train models with constant memory cost, regardless of how "deep" (or long) the integration is.
 
-> **[Visual 3: The Limit of Depth]**
+> **Equivalence in Discrete and Continuous Forms**
 >
 > ```text
 > DISCRETE (ResNet)                 CONTINUOUS (Neural ODE)
