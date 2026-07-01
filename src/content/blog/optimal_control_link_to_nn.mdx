@@ -1,0 +1,143 @@
+---
+title: "Linking Optimal Control Theory to Neural ODEs"
+tags: ["Optimal Control", "Control Theory", "Neural ODEs", "Adjoint Method", "Deep Learning", "ResNet", "Pontryagin", "Euler Method"]
+pubDate: 2026-07-1
+description: "An exploration of how Optimal Control Theory connects to Neural ODEs and ResNets."
+---
+
+> *AI disclosure : AI has been used to assist in the writing of this article. The content has been reviewed, edited, and validated by a human author (me). If something's wrong, I manually fucked it up, not the AI (I mean, it probably helped)*
+
+In contemporary deep learning, we often treat architectures like Residual Networks (ResNets) as empirical breakthroughs, design choices that happen to solve the vanishing gradient problem. However, if we look back to the mid-20th century, we find that these architectures and the methods we use to train them are deeply rooted in **Optimal Control Theory**.
+
+By revisiting the work of Lev Pontryagin and the development of the Adjoint Method, we can see that a "deep" neural network can be seen not just as a stack of layers, but as a discrete approximation of a continuous dynamical system.
+
+---
+
+## Historical Foundation: Lev Pontryagin and the Adjoint State
+
+In the 1950s, Soviet mathematician **Lev Pontryagin** was concerned with the problem of steering complex systems, Soviet rockets, toward a specific target with optimal efficiency. This work led to the **[Pontryagin Maximum Principle](https://en.wikipedia.org/wiki/Pontryagin%27s_maximum_principle)**.
+
+The core insight of Pontryagin's work is a duality in time. When we want to optimize a system, we are concerned with two distinct trajectories:
+
+1.  **The Forward State (Primal):** This is the physical evolution of the system (or the data) moving forward in time. See this as your forward pass, we go from the initial state to the final state, accumulating information along the way through the system dynamics.
+2.  **The Adjoint State (Dual):** This is a "sensitivity" signal that evolves **backward in time**. It carries information from the final error back to the initial conditions, telling us how much each moment in the past contributed to the final outcome. See this as your backpropagation pass, where we compute gradients with respect to the parameters.
+
+> **Temporal Duality**
+>
+> ```text
+> Adjoint Evolution (Sensitivity) <------------------- [Target/Error]
+> =====================================================================>
+> Forward Evolution (State)       -------------------> [End State]
+>                                 (Time Axis)
+> ```
+> *The Adjoint Method allows us to calculate gradients across a complex trajectory without the prohibitive cost of storing every intermediate derivative.*
+
+---
+
+## Control Mechanics : Closing the Loop
+
+To bridge the gap between theory and application, we must look at how a control system actually functions. In this framework, we have an initial state and a set of **control signals** $u(x)$. In the context of a neural network, $u(x)$ represents the learnable weights and biases.
+
+### The Optimization Cycle
+The process follows a logical loop that mirrors modern backpropagation:
+
+1.   **System Evolution:** We start at the initial state and allow the system to evolve forward. The output is then our End state.
+2.   **Error Computation:** We define a cost function by comparing the End state to a desired **Target**.
+3.   **Adjoint Pass:** This Error serves as the starting point for the Adjoint Evolution. We propagate this signal backward through the system's history using the adjoint equations.
+4.   **Update:** System-specific maths uses the adjoint signal to refine the controls $u(x)$. 
+
+This is the Adjoint Method by definition. It is the mathematical foundation for why backpropagation through time works: it is a systematic way to attribute final errors to parameters that acted much earlier in the process. It is important to note that classical backpropagation used in machine learning is the time-discrete case of the Adjoint Method.
+
+> ### **Control Loop**
+>
+>
+>```mermaid
+>graph TB
+>    %% Forward pass
+>    Start((Initial State))
+>    System["System Dynamics<br/>dx/dt = f(x,u,t)"]
+>    End["Final State<br/>x(T)"]
+>    Start -->|"Forward integration"| System
+>    System -->|"State trajectory x(t)"| End
+>    %% Cost evaluation
+>    Loss["Objective / Loss<br/>J(x,u)"]
+>    Target((Target))
+>    End -->|"Evaluate terminal state"| Loss
+>    Target -->|"Reference / Desired state"| Loss
+>    %% Backward pass
+>    Adjoint["Adjoint Evolution<br/>dλ/dt = -∂H/∂x"]
+>    Update["Gradient Computation<br/>Update control u(t)"]
+>    Loss -->|"Terminal condition λ(T)"| Adjoint
+>    Adjoint -->|"Gradient ∂J/∂u"| Update
+>    Update -->|"Updated control u(t)"| System
+>```
+
+
+
+
+{/* > ```mermaid
+> graph LR
+>   Start((Start)) --> System[System Dynamics]
+>   System -- "Forward Pass" --> End[End State]
+>   Target((Target)) -.-> Error[Error/Loss]
+>   End -.-> Error
+>   Error -- "Adjoint Evolution" --> Maths[Optimization/Update]
+>   Maths -- "Update u(x)" --> System
+> ``` */}
+
+---
+
+## Structural Equivalence: Euler and ResNets
+
+The most significant connection between classical control and modern AI appears when we look at how we discretize continuous motion. 
+
+If we have a continuous change in state $\frac{dx}{dt}$, the simplest way to calculate the next state is the **Euler Method**. We take the current state and add the derivative multiplied by a small time step $\epsilon$:
+
+<div className="center-equation">
+$$x(t + \epsilon) = x(t) + \frac{dx}{dt} \epsilon$$
+</div>
+
+If we look at the architecture of a **Residual Network (ResNet)**, we see an identical structure. A layer $h_{i+1}$ is defined as the previous layer $h_i$ plus a transformation $f(h_i, W_i)$:
+
+<div className="center-equation">
+$$h_{i+1} = h_i + f(h_i, W_i)$$
+</div>
+
+These are the **"Same Thing."** A ResNet layer is essentially an Euler integration step. The "skip connection" that defines the ResNet is not just a trick to improve gradient flow, it is the discrete implementation of a differential equation.
+
+---
+
+## Generalizing to Continuity: Neural ODEs
+
+Once we recognize that ResNets are equivalent to discrete Euler steps, a natural question arises: *What happens if the step size $\epsilon$ goes to zero?*
+
+This leads to the concept of **Neural Ordinary Differential Equations (Neural ODEs)**. In this paradigm, we move away from thinking about a fixed number of layers. Instead:
+*   The network defines the *vector field* or the derivative of the state.
+*   The transition from input to output is a **continuous flow**.
+*   The "depth" of the network becomes the integration time.
+
+> *Note : the mental representation shifts from information propagation in a step by step process, ie from information in layer $n$ to information in layer $n+1$ through a transformation, to a **continuous flow** of information through time, where the state evolves according to a differential equation.*
+
+By treating the network as a continuous flow, we can apply Pontryagin's Adjoint Method directly. We can solve the ODE backward in time to calculate gradients, which allows us to train models with constant memory cost, regardless of how "deep" (or long) the integration is.
+
+> **[Visual 3: The Limit of Depth]**
+>
+> ```text
+> DISCRETE (ResNet)                 CONTINUOUS (Neural ODE)
+> ------------------                -----------------------
+> Layer-by-layer step      --->     Continuous Flow
+> h_{i+1} = h_i + f(...)   --->     dx/dt = f(x, t, θ)
+> Euler Integration        --->     ODE Solver (Limit dt -> 0)
+> ```
+
+> *Note : Delayed ResNets where the information of previous layers is being reinjected is equivalent here to physically using a delay line in the ODE, which is a more general form of the dynamics incorporating some form of memory in the network.*
+
+---
+
+## Conclusion
+
+It is, in my opinion, quite remarkable that the aerospace challenges of the 1950s somehow lead to the Neural ODEs of today, showing that the principles of optimization are universal. Whether we are steering a rocket to a target or steering a data point to a classification, the underlying mathematics remain the same: we evolve forward to see where we are, and we evolve the adjoint backward to learn how to improve. 
+
+Understanding this connection allows us to view deep learning not just as a branch of computer science, but as the modern frontier of classical dynamics and optimal control.
+
+While not being the current mainstream ways of training and using AI, the fact that this is possible opens the door to new architectures and training methods that are more efficient, more interpretable, and potentially more powerful. A main advantage lies in physics itself, where lower power consumption and better generalization can be achieved by using continuous models that respect the underlying dynamics of the data. Systems can be tuned with domain-specific methods, current work use optical delay line in optical networks, and it isn't hard for any expert in any domain to imagine how to use the same principles in their own field. I strongly suggest the reader to explore Neural ODEs and think about how they can be applied to their own problems, as the potential is vast and largely untapped.
