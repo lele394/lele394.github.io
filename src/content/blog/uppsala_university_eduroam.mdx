@@ -1,0 +1,65 @@
+---
+title: "Connecting to Eduroam coming from Uppsala University (Android|Linux)"
+tags: ["eduroam", "Uppsala University", "Android", "Linux"]
+pubDate: 2026-09-14
+description: "Setting up Eduroam on Android and Linux devices when coming from Uppsala University."
+---
+
+import { Image } from 'astro:assets';
+import img1 from '../../assets/blog/uppsala_university_eduroam/geteduroam.png';
+import img2 from '../../assets/blog/uppsala_university_eduroam/linuxsetup.png';
+
+
+
+> Note: I'm a PhD student, and don't use my student account for eduroam. Please double check and contact me at [leo.bechet@it.uu.se](mailto:leo.bechet@it.uu.se) in case you find any discrepancies in the instructions below. I will update this post accordingly.
+
+I've just had to wrestle with setting up Eduroam on my Android and Linux devices after reinstalling my OS and changing phone. I figured I'd give a bit of a rundown of the process for any of you lost souls trying to figure out what can be a nightmare for non-technical users.
+
+Eduroam config through windows is rather well documented as far as I'm aware. And as for iOS users, I'm sorry for your loss.
+
+Since we're dealing with Password A and B, and that, as far as I know, password B isn't used much, I recommend you save both in a passowrd manager, Bitwarden is a very good option.
+
+
+## Android
+
+Android is the easy part. You can use the [Get Eduroam app](https://play.google.com/store/apps/details?id=app.eduroam.geteduroam&hl=en-US&pli=1) to set up your connection. Just install the app, select Uppsala University, and follow the prompts. It will handle all the necessary configurations for you.
+
+<figure className="image-card">
+<Image src={img1} alt="geteduroam app page" />
+<figcaption>geteduroam app page</figcaption>
+</figure>
+
+In order to configure your Eduroam, you need to get your ***Password B***, not the **A** one. 
+
+Setup eduroam by following the instructions in the app. It will ask you for your university (search for Uppsala University) and enter your username and password B. Your username is your Uppsala University login (e.g., David Longbottom => davlon123).
+
+If following this process doesn't work for you, go into your wifi settings, select aduroam and set the following settings :
+
+- **EAP method**: PEAP
+- **Phase 2 authentication**: MSCHAPV2
+- **CA certificate**: Trust on first use (or no certificate)
+- **Identity**: Your Uppsala University login and add `@user.uu.se` at the end (e.g., `davlon123@user.uu.se`)
+
+Other settings should have been already set by geteduroam.
+
+If you have any issues, good luck. Go ask friends around.
+
+
+## Linux
+
+Linux is a bit more complicated. I will assume you are using Ubuntu. Anyone with something else probably has advanced enough knowledge and will be able to figure it out with the information below.
+
+In order to configure your Eduroam, you need to get your ***Password B***, not the **A** one. 
+
+Copy the settings below in your wifi configuration for eduroam. Your Uppsala University login and add `@user.uu.se` at the end (e.g., for David Longbottom, `davlon123@user.uu.se`)
+<figure className="image-card">
+<Image src={img2} alt="linux setup" />
+<figcaption>Ubuntu setup</figcaption>
+</figure>
+
+
+# Final notes
+
+I hope this guide helps you set up your Eduroam connection. If you encounter any issues, don't hesitate to reach out to the IT support at Uppsala University or consult online forums for additional assistance. Remember to keep your credentials secure and avoid sharing them with others. Password managers like Bitwarden can help you manage your passwords safely. You can also check out the [Eduroam Companion app](https://play.google.com/store/apps/details?id=net.ja.android.eduroamcompanion&hl=en-US) which provide a map of the eduroam access points everywhere in the world.
+
+As much as we complain about Eduroam's legendary unstability and unreliability, you will find that it will save you at the most random moments. Bash it, but respect it.
