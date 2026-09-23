@@ -1,0 +1,51 @@
+---
+title: "Setting up OpenHands through OpenWebUI's Ollama endpoint"
+tags: ["OpenHands", "OpenWebUI", "Ollama", "AI", "Machine Learning", "agentic"]
+pubDate: 2026-09-23
+description: "A quick guide on how to set up OpenHands 1.22.0 using OpenWebUI's Ollama endpoint for agentic AI applications."
+---
+
+[OpenHands](https://www.openhands.dev/) can be a tough nut to crack when setting it up with self-hosted LLMs. I seem to have been facing some sort of bug where OpenHands, for some reasons, sanitizes out the provider before passing the value to LiteLLM, leading you to get an anooying "Provider not specified" error. The following post is my current setup and workaround to get OpenHands 1.22.0 working with OpenWebUI's Ollama endpoint.
+
+My setup consists in an [Ollama](https://ollama.com/) server running on a distant server. This Ollama server itself is being used by an hosted [OpenWebUI](https://openwebui.com/) instance which provide both an OpenAI and Ollama endpoint. OpenWebUI is what I use for auth, for simplicity, it is then exposed through a Cloudflare tunnel.
+
+Using `ollama` or `ollama_chat` as providers directly in OpenHands will, for some reason, send your JSON request formatted as a string instead of a JSON object, leading to OpenWebUI not understanding it. The workaround is to use `openai`.
+
+First of all, go grab your OpenWebUI API key, which you can find under settings > accounts > API keys. It should look something like `sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`.
+
+Let's first check what models you have available :
+
+```bash
+$ export OPENWEBUI_API_KEY='sk-youractualapikey'
+
+$ export OPENWEBUI_DOMAIN='https://your-openwebui-instance.com'
+
+$ curl -s https://$OPENWEBUI_DOMAIN/api/v1/models   -H "Authorization: Bearer $OPENWEBUI_API_KEY" | jq '.data[].id'                     
+"gemma4:26b-a4b-it-mtp-q4_K_M"
+"qwen3.8:27b-mtp-q4_K_M"
+"arena-model"
+```
+
+> Note that the domain can be an ip+port combo like `http://127.0.0.1:8080` if you are running OpenWebUI locally, or a domain name if you are using a tunnel.
+
+In this example, I have both Gemma4 and Qwen3.8 available, here I will focus on setting up Qwen3.8. Let's check the model details:
+
+```bash
+$ curl -s https://$OPENWEBUI_DOMAIN/ollama/api/chat -H "Authorization: Bearer $OPENWEBUI_API_KEY" -H "Content-Type: application/json" -d '{"model":"qwen3.8:27b-mtp-q4_K_M","messages":[{"role":"user","content":"hi"}],"stream":false}' >/dev/null && curl -s https://$OPENWEBUI_DOMAIN/ollama/api/ps -H "Authorization: Bearer $OPENWEBUI_API_KEY" | jq -r '.models[] | "\(.name): context=\(.context_length)"'
+qwen3.8:27b-mtp-q4_K_M: context=131072
+```
+> Note that we first send a dummy request to the chat endpoint to make sure the model is loaded, otherwise the `ps` endpoint will not return it.
+
+The current reported context length for Qwen3.8 is 131072 tokens in this case. We now have enough infos to set up openhands.
+
+In the GUI, navigate to the settings > LLMs section > Add LLM Profile. We do not need to setup a provider. Now search and fill out the following fields:
+
+1. **Authentification** : API Key
+2. **Custom Model** : `openai/NameOfModel` (in our case `openai/qwen3.8:27b-mtp-q4_K_M`)
+3. **Base URL** : `https://your-openwebui-instance.com/api/v1` (replace with your actual OpenWebUI domain, we use the OpenAI compatible endpoint)
+
+> It is important to use the OpenAI compatible endpoint, as OpenHands will send requests in OpenAI format. Ollama endpoint is broken, as stated above. Using the `All` mode instead of `Basic` or `Advanced` is the only way I have found that does not trigger the LiteLLM bug that sanitizes out the provider. Time to get your hands dirty in configs.
+
+Now you can also tune other parameters such as the reasoning effort, Top P, Top K, etc. Note that we do not use the context length parameter; I've seen report it's not working yet. To be sure I still did paste it as the max input token. Max out put token might also need to be set to something like 32k, but I'm not sure about it.
+
+Now that your profile is all setup and filled out, you can click `Save`, which will grey out to `Validating...` for a few seconds. If all has been correctly setup, the profile will be validated and you will be able to use it in your OpenHands agentic AI applications.
